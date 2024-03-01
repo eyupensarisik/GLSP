@@ -1,0 +1,30 @@
+@ECHO OFF
+
+set BINDIR=x64\Debug
+set DATADIR=%1
+set RESULTDIR=Results\%1_%2_%3
+set SUMMARYFILE=GLSP_standart_%1_%2_%3.csv
+set EXECUTABLE=GLSP.exe
+
+set NEW_P=%2
+set NEW_T=%3
+
+IF EXIST %RESULTDIR% rmdir /S /Q %RESULTDIR%
+md %RESULTDIR%
+
+ECHO Name,^
+P,^
+T,^
+GLSP_CPU,^
+GLSP_Solve,^
+GLSP_LB,^
+GLSP_UB,^
+GLSP_Obj,^
+GLSP_Gap,^
+ > %RESULTDIR%\%SUMMARYFILE%
+
+FOR %%f IN (%DATADIR%\*.dat) DO (
+	ECHO Started solving %%f
+	REM ECHO %BINDIR%\%EXECUTABLE% %%f %RESULTDIR%\%%~nxf %RESULTDIR%\%SUMMARYFILE% %NEW_M% %NEW_T% 
+	%BINDIR%\%EXECUTABLE% %%f %RESULTDIR%\%%~nxf %RESULTDIR%\%SUMMARYFILE% %NEW_M% %NEW_T% > %RESULTDIR%\%%~nxf.log & IF ERRORLEVEL 1 GOTO:EOF
+)

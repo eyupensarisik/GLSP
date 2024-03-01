@@ -1,0 +1,17 @@
+# Parameters: 
+P 2
+T 2
+S 4
+M 99
+# Costs: S_b[t]  S_f[t]  L[t]  K[t]
+0 2 1 2
+2 4 3 2
+# a m h f c 
+1 1 1 0 0 
+1 2 1 0 0
+# Demand
+1 0
+0 3
+# Setup
+0 0
+0 0
