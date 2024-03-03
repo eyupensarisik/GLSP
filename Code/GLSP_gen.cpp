@@ -89,13 +89,17 @@ void GLSP::SetupModel(double timeLimit)
 
 
 	// Constraint (7)
-	/*for (int p = 0; p < P; ++p)
+	for (int p = 0; p < P; ++p)
 		for (int r = 0; r < P; ++r)
 			for (int s = 1; s < S; ++s)
-				model.add(z[p][r][s] >= y[p][s-1] + y[r][s] - 1);*/
+				model.add(z[p][r][s] >= y[p][s-1] + y[r][s] - 1);
+
+	for (int p = 0; p < P; ++p)
+		for (int r = 0; r < P; ++r)
+			model.add(z[p][r][0] == 0);
 
 	// Constraint (7.1)
-	for (int p = 0; p < P; ++p)
+	/*for (int p = 0; p < P; ++p)
 		for (int s = 1; s < S; ++s) {
 			IloExpr NF1(env);
 			for (int r = 0; r < P; ++r)
@@ -110,7 +114,7 @@ void GLSP::SetupModel(double timeLimit)
 			for (int p = 0; p < P; ++p)
 				NF2 += z[p][r][s];
 			model.add(NF2 == y[r][s]);
-		}
+		}*/
 		
 	// Objective function terms
 	// Setup cost

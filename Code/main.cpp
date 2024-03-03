@@ -6,7 +6,7 @@
 
 int main(int nParams, char* params[])
 {
-	string inputFileName = (nParams > 1 ? params[1] : "SingleMachineCapVar/Data1-15-5-0.6-0.5-50-100-100-0.dat");
+	string inputFileName = (nParams > 1 ? params[1] : "../../Data/SingleMachineCapVar2/Data1-15-15-0.6-0.5-50-100-100-0.dat");
 	string inputFileNameOnly;
 
 	auto fileNameBegin = inputFileName.find_last_of("/\\");
@@ -24,8 +24,8 @@ int main(int nParams, char* params[])
 	string outputFileName = (nParams > 2 ? params[2] : inputFileNameOnly + "_result.csv");
 	string summaryFileName = (nParams > 3 ? params[3] : "summary.csv");
 
-	int mOverride = stoi((nParams > 4 ? params[4] : "0"));
-	int tOverride = stoi((nParams > 5 ? params[5] : "0"));
+	int pOverride = 5;// stoi((nParams > 4 ? params[4] : "0"));
+	int tOverride = 5;//stoi((nParams > 5 ? params[5] : "0"));
 
 	ofstream summaryFile;
 	if (nParams > 3)
@@ -51,10 +51,10 @@ int main(int nParams, char* params[])
 	{
 		cout << endl << endl << "Reading " << inputFileName << endl;
 		PP.ReadData(file);
-		if (mOverride > 0 && tOverride > 0)
-			PP.Resize(mOverride, tOverride);
+		if (pOverride > 0 && tOverride > 0)
+			PP.Resize(pOverride, tOverride);
 
-		int timeLimit = 600;
+		int timeLimit = 60;
 
 		double CPUTime_GLSP = 0;
 		double SolveTime_GLSP = 0;

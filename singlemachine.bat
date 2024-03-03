@@ -1,1 +1,0 @@
-call .\run.bat SingleMachineCapVar2 0 0

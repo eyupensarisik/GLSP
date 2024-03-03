@@ -57,6 +57,13 @@ void ProductPeriods::Resize(int NewP, int NewT)
 
 	P = NewP;
 	T = NewT;
+	S = NewP * NewT;
+
+	for (int t = 0; t < T; ++t) {
+		S_b[t] = P * t;
+		S_f[t] = P * (t + 1);
+		L[t] = (P * (t + 1)) - 1;
+	}
 }
 
 void ProductPeriods::ReadData(ifstream& file)

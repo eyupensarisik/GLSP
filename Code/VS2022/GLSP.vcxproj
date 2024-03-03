@@ -19,17 +19,19 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="BSP-1.cpp" />
-    <ClCompile Include="Common.cpp" />
-    <ClCompile Include="DataPrep.cpp" />
-    <ClCompile Include="GLSP-1.cpp" />
-    <ClCompile Include="GLSP_gen.cpp" />
-    <ClCompile Include="main.cpp" />
-    <ClCompile Include="TwoPhase.cpp" />
+    <ClCompile Include="..\BSP-1.cpp" />
+    <ClCompile Include="..\Common.cpp" />
+    <ClCompile Include="..\DataPrep.cpp" />
+    <ClCompile Include="..\GLSP-1.cpp" />
+    <ClCompile Include="..\GLSP_gen.cpp" />
+    <ClCompile Include="..\main.cpp" />
+    <ClCompile Include="..\TwoPhase.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="DataPrep.h" />
-    <ClInclude Include="GLSP_gen.h" />
+    <ClInclude Include="..\Common.h" />
+    <ClInclude Include="..\DataPrep.h" />
+    <ClInclude Include="..\GLSP_gen.h" />
+    <ClInclude Include="..\TwoPhase.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectName>GLSP</ProjectName>

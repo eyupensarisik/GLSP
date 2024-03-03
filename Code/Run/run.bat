@@ -1,7 +1,7 @@
 @ECHO OFF
 
 set BINDIR=x64\Debug
-set DATADIR=%1
+set DATADIR=..\..\Data\%1
 set RESULTDIR=Results\%1_%2_%3
 set SUMMARYFILE=GLSP_standart_%1_%2_%3.csv
 set EXECUTABLE=GLSP.exe
