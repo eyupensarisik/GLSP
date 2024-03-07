@@ -24,8 +24,8 @@ int main(int nParams, char* params[])
 	string outputFileName = (nParams > 2 ? params[2] : inputFileNameOnly + "_result.csv");
 	string summaryFileName = (nParams > 3 ? params[3] : "summary.csv");
 
-	int pOverride = 5;// stoi((nParams > 4 ? params[4] : "0"));
-	int tOverride = 5;//stoi((nParams > 5 ? params[5] : "0"));
+	int pOverride = stoi((nParams > 4 ? params[4] : "0"));
+	int tOverride = stoi((nParams > 5 ? params[5] : "0"));
 
 	ofstream summaryFile;
 	if (nParams > 3)
@@ -54,7 +54,7 @@ int main(int nParams, char* params[])
 		if (pOverride > 0 && tOverride > 0)
 			PP.Resize(pOverride, tOverride);
 
-		int timeLimit = 60;
+		int timeLimit = 600;
 
 		double CPUTime_GLSP = 0;
 		double SolveTime_GLSP = 0;
