@@ -1,1 +1,9 @@
 call ..\Run\run.bat SingleMachineCapVar2 5 5
+call ..\Run\run.bat SingleMachineCapVar2 5 10
+call ..\Run\run.bat SingleMachineCapVar2 5 15
+call ..\Run\run.bat SingleMachineCapVar2 10 5
+call ..\Run\run.bat SingleMachineCapVar2 10 10
+call ..\Run\run.bat SingleMachineCapVar2 10 15
+call ..\Run\run.bat SingleMachineCapVar2 15 5
+call ..\Run\run.bat SingleMachineCapVar2 15 10
+call ..\Run\run.bat SingleMachineCapVar2 0 0
