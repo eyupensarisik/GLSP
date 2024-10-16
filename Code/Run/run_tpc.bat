@@ -16,11 +16,11 @@ md %RESULTDIR%
 ECHO Name,^
 P,^
 T,^
-GLSP_CPU,^
-GLSP_LB,^
-GLSP_UB,^
-GLSP_Obj,^
-GLSP_Gap,^
+TwoPhase_Callback_Cut,^
+TwoPhase_CPU,^
+TwoPhase_Obj,^
+TwoPhase_Callback_CPU,^
+TwoPhase_Callback_Call,^
  > %RESULTDIR%\%SUMMARYFILE%
 
 FOR %%f IN (%DATADIR%\*.dat) DO (

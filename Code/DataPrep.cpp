@@ -72,7 +72,7 @@ void ProductPeriods::ReadData(ifstream& file)
 	char DummyLine[MAX_LINE_LENGTH];
 	string DummyToken;
 	char digit;
-	vector<int> digits;
+	vector<int> digits;	
 
 	file >> DummyToken >> DummyToken >> P >> DummyToken;
 	file >> DummyToken >> DummyToken >> T >> DummyToken;
@@ -132,7 +132,7 @@ void ProductPeriods::ReadData(ifstream& file)
 		S_f[t] = P * (t + 1);
 		L[t] = (P * (t + 1)) - 1;
 	}
-
+	/*
 	cout << "Value of DummyToken is " << DummyToken << endl;
 	cout << "Value of digit is " << digit << endl;
 
@@ -158,6 +158,16 @@ void ProductPeriods::ReadData(ifstream& file)
 	}
 	for (int t = 0; t < T; ++t)
 		cout << "Value of L[" << t << "] is " << L[t] << endl;
+	*/
+	vector<int> cap;
+	cap.resize(T);
+	cap = { 716, 715, 702, 735, 723, 752, 794, 738, 736, 743, 799, 705, 894, 792, 767 };
+
+	for (int t = 0; t < T; ++t)
+		K[t] = cap[t];
+	
+	for (int t = 0; t < T; ++t)
+		cout << "Value of K[" << t << "] is " << K[t] << endl;
 }
 
 string to_string(const IntegerVector& vect)

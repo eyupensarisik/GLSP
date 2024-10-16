@@ -1,0 +1,3 @@
+GLSP_Standard	1
+GLSP_NF		0
+TIME_LIMIT	600

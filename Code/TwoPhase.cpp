@@ -1,11 +1,14 @@
+
 #include "TwoPhase.h"
 #include "DataPrep.h"
+#include "setupDP.h"
+#include "Subproblems.h"
 #include <chrono>
 #include <numeric>
 
 typedef vector<vector<double>> Matrix;
 
-TwoPhase::TwoPhase(ProductPeriods& PPIn) : PP(PPIn), model(env), cplex(env)
+TwoPhase::TwoPhase(ProductPeriods& PPIn, ParameterMap& PM) : PP(PPIn), Parameters(PM), model(env), cplex(env)
 {
 	BestBoundThreshold = DBL_MAX;
 }
@@ -17,176 +20,434 @@ TwoPhase::~TwoPhase()
 
 void TwoPhase::SetupModel()
 {
-	int P = PP.P;
-	int T = PP.T;
-	int S = PP.S;
-	int M = PP.M;
+	// Setup Master Problem
 
-	I = CreateNumVarArray2(env, P, T, "I", 0, IloInfinity);
-	q = CreateNumVarArray2(env, P, S, "q", 0, IloInfinity);
+	theta = IloNumVar(env, 0, IloInfinity, "theta");
+	gamma = IloNumVar(env, 0, IloInfinity, "gamma");
+	theta_t = CreateNumVarArray(env, PP.T, "theta_t", 0, IloInfinity);
 
-	y = CreateBoolVarArray2(env, P, S, "y");
-	z = CreateBoolVarArray3(env, P, P, S, "z");
+	I = CreateNumVarArray2(env, PP.P, PP.T, "I", 0, IloInfinity);
+	q = CreateNumVarArray2(env, PP.P, PP.T, "q", 0, IloInfinity);
 
+	x = CreateBoolVarArray2(env, PP.P, PP.T, "x");
+
+	theta.setStringProperty("Type", "theta");
+	theta.setIntProperty("Product", -1);
+
+	for (int p = 0; p < PP.P; ++p)
+		for (int t = 0; t < PP.T; ++t)
+		{
+			x[p][t].setStringProperty("Type", "x");
+			x[p][t].setIntProperty("Product", p);
+		}
+	for (int p = 0; p < PP.P; ++p)
+		for (int t = 0; t < PP.T; ++t) {
+			model.add(I[p][t]);
+			model.add(q[p][t]);
+			model.add(x[p][t]);
+		}
+	model.add(theta);
+	model.add(gamma);
+
+	for (int t = 0; t < PP.T; ++t)
+		model.add(theta_t[t]);
+
+	IloExpr MPobj1(env);
+	for (int p = 0; p < PP.P; ++p)
+		for (int t = 0; t < PP.T; ++t)
+			MPobj1 += (PP.Products[p].f * x[p][t] + PP.Products[p].c * q[p][t]);
+
+	IloExpr MPobj2(env);
+	for (int p = 0; p < PP.P; ++p)
+		for (int t = 0; t < PP.T; ++t)
+			MPobj2 += PP.Products[p].h * I[p][t];
+
+	IloExpr total_MPobj(env);
+	total_MPobj = MPobj1 + MPobj2 + theta;
+
+	obj = IloMinimize(env, total_MPobj);
+	model.add(obj);
 
 	// Constraint (2)
-	for (int p = 0; p < P; ++p)
-		for (int t = 1; t < T; ++t) {
-			double Demand = PP.Products[p].d[t];
-			IloExpr InvBal(env);
-			for (int s = PP.S_b[t]; s < PP.S_f[t]; ++s)
-				InvBal += q[p][s];
-			model.add(I[p][t] == I[p][t - 1] + InvBal - Demand);
+	for (int p = 0; p < PP.P; ++p)
+		for (int t = 1; t < PP.T; ++t) {
+			model.add(I[p][t] == I[p][t - 1] + q[p][t] - PP.Products[p].d[t]);
 		}
 
 	// Constraint (2.1)
-	for (int p = 0; p < P; ++p)
+	for (int p = 0; p < PP.P; ++p)
 		for (int t = 0; t < 1; ++t) {
-			double Demand = PP.Products[p].d[t];
-			IloExpr InvBal2(env);
-			for (int s = PP.S_b[t]; s < PP.S_f[t]; ++s)
-				InvBal2 += q[p][s];
-			model.add(I[p][t] == InvBal2 - Demand);
+			model.add(I[p][t] == q[p][t] - PP.Products[p].d[t]);
 		}
 
 	// Constraint (3)
-	for (int t = 0; t < T; ++t) {
+	for (int t = 0; t < PP.T; ++t) {
 		IloExpr Cap(env);
-		for (int p = 0; p < P; ++p)
-			for (int s = PP.S_b[t]; s < PP.S_f[t]; ++s)
-				Cap += PP.Products[p].a * q[p][s];
+		for (int p = 0; p < PP.P; ++p)
+			Cap += PP.Products[p].a * q[p][t];
 		model.add(Cap <= PP.K[t]);
 	}
 
 	// Constraint (4)
-	for (int t = 0; t < T; ++t)
-		for (int p = 0; p < P; ++p)
-			for (int s = 0; s < S; ++s)
-				model.add(q[p][s] * PP.Products[p].a <= PP.K[t] * y[p][s]);
+	for (int t = 0; t < PP.T; ++t)
+		for (int p = 0; p < PP.P; ++p)
+			model.add(q[p][t] * PP.Products[p].a <= PP.K[t] * x[p][t]);
 
-	// Constraint (5)
-	for (int s = 0; s < S; ++s) {
-		IloExpr Each(env);
-		for (int p = 0; p < P; ++p)
-			Each += y[p][s];
-		model.add(Each == 1);
-	}
+	Subproblems SP(PP, Parameters);
 
-	// Constraint (6.1)
-	for (int p = 0; p < P; ++p)
-		for (int s = 0; s < S; ++s)
-			if (s == 0)
-				model.add(q[p][s] >= PP.Products[p].m * (y[p][s]));
-			else
-				model.add(q[p][s] >= PP.Products[p].m * (y[p][s] - y[p][s - 1]));
+	int W_In = PP.P;
 
-	// Constraint (6.2)
-	/*for (int p = 0; p < P; ++p)
-		for (int t = 0; t < T-1; ++t)
-			for (int s = 0; s < S; ++s)
-				if (s == 0)
-					model.add(q[p][s] >= PP.Products[p].m * (y[p][s]));
-				else if (s == PP.L[t])
-					model.add(q[p][s] + q[p][s + 1] >= PP.Products[p].m * (y[p][s] - y[p][s - 1]));
-				else
-					model.add(q[p][s] >= PP.Products[p].m * (y[p][s] - y[p][s - 1]));*/
-
-
-					// Constraint (7)
-	for (int p = 0; p < P; ++p)
-		for (int r = 0; r < P; ++r)
-			for (int s = 1; s < S; ++s)
-				model.add(z[p][r][s] >= y[p][s - 1] + y[r][s] - 1);
-
-	for (int p = 0; p < P; ++p)
-		for (int r = 0; r < P; ++r)
-			model.add(z[p][r][0] == 0);
-
-	// Constraint (7.1)
-	/*for (int p = 0; p < P; ++p)
-		for (int s = 1; s < S; ++s) {
-			IloExpr NF1(env);
-			for (int r = 0; r < P; ++r)
-				NF1 += z[p][r][s];
-			model.add(NF1 == y[p][s - 1]);
+	vector<int> wp_In;
+	wp_In.resize(W_In + 2);
+	vector<int> wt_In;
+	wt_In.resize(W_In + 2);
+	vector<int> wop_In;
+	wop_In.resize(PP.P - W_In + 2);
+	vector<int> wot_In;
+	wot_In.resize(PP.P - W_In + 2);
+	int j = 0;
+	for (int p = 0; p < PP.P; ++p)
+		for (int t = 0; t < 1; ++t) {
+			j += 1;
+			wp_In[j] = p;
+			wt_In[j] = t;
 		}
 
-	// Constraint (7.2)
-	for (int r = 0; r < P; ++r)
-		for (int s = 0; s < S; ++s) {
-			IloExpr NF2(env);
-			for (int p = 0; p < P; ++p)
-				NF2 += z[p][r][s];
-			model.add(NF2 == y[r][s]);
-		}*/
+	SP.SetupBSPModel(W_In, wp_In, wt_In, wop_In, wot_In);
+	SP.BSP_Solve();
 
-		// Objective function terms
-		// Setup cost
-	IloExpr obj1(env);
-	for (int p = 0; p < P; ++p)
-		for (int s = 0; s < S; ++s)
-			obj1 += (PP.Products[p].f * y[p][s] + PP.Products[p].c * q[p][s]);
+	LB_theta = SP.GetBSP_UB();
+	//MPmodel.add(theta >= LB_theta);
 
-	// Production cost
-	IloExpr obj2(env);
-	for (int p = 0; p < P; ++p)
-		for (int r = 0; r < P; ++r)
-			for (int s = 0; s < S; ++s)
-				obj2 += PP.Products[p].s_pr[r] * z[p][r][s];
+	IloExpr thetaCut(env);
+	for (int t = 0; t < PP.T; ++t)
+		thetaCut += theta_t[t];
 
-	// Holding cost
-	IloExpr obj3(env);
-	for (int p = 0; p < P; ++p)
-		for (int t = 0; t < T; ++t)
-			obj3 += PP.Products[p].h * I[p][t];
-
-	IloExpr total_obj(env);
-	total_obj = obj1 + obj2 + obj3;
-
-	IloObjective obj = IloMinimize(env, total_obj);
-	model.add(obj);
+	model.add(theta >= thetaCut + gamma);
 
 	cplex = IloCplex(model);
+
 }
 
-bool TwoPhase::Solve(double timeLimit)
-{
+bool TwoPhase::Solve(double timeLimit, double* TwoPhase_Iter, double* TwoPhase_Cut, double* TwoPhase_CPU, double* TwoPhase_Obj, double* SP_Cons_CPU, double* SP_Solve_CPU, double* MP_CPU)
+{	
 	cplex.setParam(IloCplex::ClockType, 2);
 	auto startTime = chrono::high_resolution_clock::now();
 
 	if (timeLimit > 0)
 		cplex.setParam(IloCplex::TiLim, timeLimit);
 
-	//cplex.setParam(IloCplex::Threads, GetParameterValue(Parameters, "THREAD_COUNT"));
-
 	try
 	{
-		pCallback = make_unique<TwoPhaseCallback>(this);
-		CPXLONG contextmask = IloCplex::Callback::Context::Id::Candidate
-			| IloCplex::Callback::Context::Id::GlobalProgress;
-		cplex.use(pCallback.get(), contextmask);
+		//Algorithm
 
-		/* Initial solution
-		if (GetParameterValue(Parameters, "USE_INITIAL_SOLUTION") && !InitialSolution.empty())
+		auto startTP = chrono::high_resolution_clock::now();
+
+		double iter = 0;
+		double opt_cut = 0;
+		double UB = 0;
+		double SPtime = 0;
+		double TotalSPtime = 0;
+		double TotalSPcons_time = 0;
+
+		while (true)
 		{
-			IloNumVarArray vars(env);
-			IloNumArray values(env);
-			for (int m = 0; m < MS.M; ++m)
+			iter += 1;
+
+			// Solve Master Problem
+			cplex.exportModel("MP_GLSP.lp");
+			bool result = cplex.solve();
+
+			if (result && cplex.isPrimalFeasible())
 			{
-				vars.add(z[m]);
-				values.add(InitialSolution[m]);
+				double theta_hat = cplex.getValue(theta);
+				int W = 0;
+				for (int p = 0; p < PP.P; ++p) {
+					for (int t = 0; t < PP.T; ++t) {
+						if (cplex.getValue(x[p][t]) >= 1 - 0.0001) {
+							W += 1;
+						}
+					}
+				}
+
+				Matrix x_val;
+				x_val.resize(PP.P);
+				for (int p = 0; p < PP.P; ++p)
+					x_val[p].resize(PP.T);
+
+				for (int p = 0; p < PP.P; ++p) {
+					for (int t = 0; t < PP.T; ++t) {
+						if (cplex.getValue(x[p][t]) >= 1 - 0.0001) {
+							x_val[p][t] = 1;
+						}
+						else
+							x_val[p][t] = 0;
+					}
+				}
+
+				vector<int> q_hat;
+				q_hat.resize(W + 2);
+				int j = 0;
+				for (int p = 0; p < PP.P; ++p)
+					for (int t = 0; t < PP.T; ++t)
+						if (x_val[p][t] >= 1 - 0.0001) {
+							j += 1;
+							q_hat[j] = cplex.getValue(q[p][t]);
+						}
+
+				//Construct Subproblem
+				auto startSP_cons = chrono::high_resolution_clock::now(); //Start clock for SP
+
+				vector<int> wp;
+				wp.resize(W + 2);
+				vector<int> wt;
+				wt.resize(W + 2);
+				vector<int> wop;
+				wop.resize(PP.P * PP.T - W + 2);
+				vector<int> wot;
+				wot.resize(PP.P * PP.T - W + 2);
+				j = 0;
+				int k = 0;
+				for (int p = 0; p < PP.P; ++p)
+					for (int t = 0; t < PP.T; ++t)
+						if (x_val[p][t] >= 1 - 0.0001) {
+							j += 1;
+							wp[j] = p;
+							wt[j] = t;
+						}
+						else {
+							k += 1;
+							wop[k] = p;
+							wot[k] = t;
+						}
+
+				Subproblems SP(PP, Parameters);
+
+				SP.SetupBSPModel(W, wp, wt, wop, wot);
+				
+
+				auto finishSP_cons = chrono::high_resolution_clock::now();
+				auto SPcons_time = chrono::duration_cast<chrono::milliseconds>(finishSP_cons - startSP_cons);
+				TotalSPcons_time += SPcons_time.count();
+
+				auto startSP = chrono::high_resolution_clock::now(); //Start clock for SP
+				SP.BSP_Solve();
+
+				auto finishSP = chrono::high_resolution_clock::now();
+				auto SPtime = chrono::duration_cast<chrono::milliseconds>(finishSP - startSP);
+				TotalSPtime += SPtime.count();
+
+				double nu_hat = SP.GetBSP_UB();
+				SP.GetBSP_Solutions(W);
+
+				// Optimal solution
+				if (nu_hat <= theta_hat)
+				{
+					Solved = 1;
+					cplex.exportModel("MP_GLSP.lp");
+					for (int t = 0; t < PP.T; ++t)
+						cout << cplex.getValue(theta_t[t]) << endl;
+					cout << cplex.getValue(gamma) << endl;
+					auto finishTP = chrono::high_resolution_clock::now();
+					auto TPtime = chrono::duration_cast<chrono::milliseconds>(finishTP - startTP);
+					cout << "Optimal solution found " << endl;
+					cout << cplex.getObjValue() << endl;
+					cout << "Number of iterations " << iter << endl;
+					cout << "Number of optimality cuts " << opt_cut << endl;
+					cout << "Time Spent for TwoPhase Decomposition = " << (float)TPtime.count() / 1000 << endl;
+					cout << "Time Spent for SP Construction = " << (float)TotalSPcons_time / 1000 << endl;
+					cout << "Time Spent for SP Solve = " << (float)TotalSPtime / 1000 << endl;
+					cout << "TwoPhase objective " << cplex.getObjValue() << endl;
+					cout << "Value of theta is " << cplex.getValue(theta) << endl;
+
+					for (int j = 1; j < W + 1; ++j)
+						for (int l = 1; l < W + 1; ++l) {
+							if (SP.e_val[j][l] > 0.5)
+								cout << "Value of e[" << j << "][" << l << "] is " << SP.e_val[j][l] << endl;
+						}
+
+					for (int p = 0; p < PP.P; ++p) {
+						for (int t = 0; t < PP.T; ++t) {
+							if (x_val[p][t] >= 0.5)
+								cout << "Value of x[" << p << "][" << t << "] is " << x_val[p][t] << endl;
+						}
+					}
+
+					*TwoPhase_Iter = iter;
+					*TwoPhase_Cut = opt_cut;
+					*TwoPhase_CPU = (float)TPtime.count() / 1000;
+					*TwoPhase_Obj = cplex.getObjValue();
+					*SP_Cons_CPU = (float)TotalSPcons_time / 1000;
+					*SP_Solve_CPU = (float)TotalSPtime / 1000;
+					*MP_CPU = *TwoPhase_CPU - *SP_Cons_CPU - *SP_Solve_CPU;
+
+					break;
+				}
+				//Add optimality cut to Master Problem
+				else
+				{
+					opt_cut += 1;
+
+					vector<int> SP_Sol;
+					SP_Sol.resize(W);
+
+					vector<int> SP_Sol2;
+
+					int j = 0;
+					int i = 0;
+					for (int l = 1; l < W + 1; ++l)
+						if (SP.e_val[j][l] > 0.5) {
+							cout << "Value of e[" << j << "][" << l << "] is " << SP.e_val[j][l] << endl;
+							j = l;
+							l = 0;
+							SP_Sol[i] = j;
+							i += 1;
+						}
+
+					//DP implementation
+					setupDP sDP;
+					map <pair<int, set<int>>, int> Cache;
+					vector<double> LBsetup;
+					LBsetup.resize(PP.T);
+
+					Matrix LBsetupPer;
+					LBsetupPer.resize(PP.P);
+					for (int p = 0; p < PP.P; ++p)
+						LBsetupPer[p].resize(PP.T);
+
+					int LBsetupDP = 0;
+
+					int per = 0;
+					int pre_per = 0;
+
+					for (int t = 0; t < PP.T; ++t) {
+						for (int p = 0; p < PP.P; ++p) {
+							if (x_val[p][t] >= 0.5)
+								per += 1;
+						}
+
+						set<int> current;
+						for (int i = pre_per; i < per; ++i)
+							current.insert(SP_Sol[i]);
+
+						if (!current.empty()) {
+							cout << "Finding minimum setup" << endl;
+							LBsetupDP = sDP.MinSetup(Cache, SP.SP_setup, -1, current);
+							cout << "Done. Minimum setup: " << LBsetupDP << endl;
+						}
+						else
+							LBsetupDP = 0;
+
+						LBsetup[t] = LBsetupDP;
+
+						auto currentCopy = current;
+					if (pre_per != per){
+						for (int i = pre_per; i < per; ++i) {
+							current.erase(SP_Sol[i]);
+
+							if (!current.empty()) {
+								cout << "Finding minimum setup" << endl;
+								LBsetupDP = sDP.MinSetup(Cache, SP.SP_setup, -1, current);
+								cout << "Done. Minimum setup: " << LBsetupDP << endl;
+							}
+							else
+								LBsetupDP = 0;
+
+							current = currentCopy;
+
+							LBsetupPer[wp[SP_Sol[i]]][t] = LBsetupDP;
+						}
+					}
+					else
+						for (int p = 0; p < PP.P; ++p)
+							LBsetupPer[p][t] = 0;
+						pre_per = per;
+					}
+
+					vector<int> LBsetupPermin;
+					LBsetupPermin.resize(PP.T);
+					for (int t = 0; t < PP.T; ++t)
+						LBsetupPermin[t] = INT_MAX;
+
+					for (int t = 0; t < PP.T; ++t)
+						for (int p = 0; p < PP.P; ++p)
+							if (LBsetupPer[p][t] < LBsetupPermin[t])
+								LBsetupPermin[t] = LBsetupPer[p][t];
+
+					IloExpr Sum1(env);
+					for (int j = 1; j < W + 1; ++j)
+						Sum1 += x[wp[j]][wt[j]];
+					cout << Sum1 << endl;
+
+					IloExpr Sum2(env);
+					for (int k = 1; k < (PP.P * PP.T - W + 1); ++k)
+						Sum2 += x[wop[k]][wot[k]];
+					cout << Sum2 << endl;
+
+					IloExpr OptCut(env);
+					OptCut = Sum1 - Sum2;
+					cout << OptCut << endl;
+
+					for (int t = 0; t < PP.T; ++t) {
+						IloExpr DPCut(env);
+						for (int p = 0; p < PP.P; ++p) {
+							if (x_val[p][t] >= 0.5) 
+								DPCut += (LBsetup[t] - LBsetupPermin[t]) * (1 - x[p][t]);
+						}
+						model.add(theta_t[t] >= LBsetup[t] - DPCut);
+					}
+
+					double LBsetuptotal = 0;
+					for (int t = 0; t < PP.T; ++t)
+						LBsetuptotal += LBsetup[t];
+
+					double LBresidual = nu_hat - LBsetuptotal;
+
+					IloExpr GMCut(env);
+					for (int t = 0; t < PP.T; ++t) {
+						for (int p = 0; p < PP.P; ++p) {
+							if (x_val[p][t] >= 0.5) 
+								GMCut += LBresidual * (1 - x[p][t]);
+							else
+								GMCut += LBresidual * (x[p][t]);
+						}
+					}
+					
+					model.add(gamma >= LBresidual - GMCut);
+
+					model.add(theta >= (nu_hat - LB_theta) * Sum1 - (nu_hat - LB_theta) * (W - 1) + LB_theta);
+
+				}
+				SP.SPmodel.end();
 			}
+			else {
+				Solved = 1;
+				cout << "The problem is infeasible..." << endl;
+			}
+				
+			auto finishB = chrono::high_resolution_clock::now();
+			auto Btime = chrono::duration_cast<chrono::milliseconds>(finishB - startTP);
+			// Time limit exceeded... STOP
+			if (Btime.count() / 1000 > 600)
+			{
+				bool result1 = cplex.solve();
+				cout << "Time limit exceeded..." << endl;
+				cout << "Number of iterations " << iter << endl;
+				cout << "Number of optimality cuts " << opt_cut << endl;
+				cout << "Time Spent for TwoPhase Decomposition = " << (float)Btime.count() / 1000 << endl;
+				cout << "Lower bound " << cplex.getObjValue() << endl;
 
-			if (cplex.getNMIPStarts())
-				cplex.deleteMIPStarts(0);
-			cplex.addMIPStart(vars, values, IloCplex::MIPStartEffort::MIPStartSolveFixed);
+				*TwoPhase_Iter = iter;
+				*TwoPhase_Cut = opt_cut;
+				*TwoPhase_CPU = (float)Btime.count() / 1000;
+				*TwoPhase_Obj = cplex.getObjValue();
+				*SP_Cons_CPU = (float)TotalSPcons_time / 1000;
+				*SP_Solve_CPU = (float)TotalSPtime / 1000;
+				*MP_CPU = *TwoPhase_CPU - *SP_Cons_CPU - *SP_Solve_CPU;
 
-			vars.end();
-			values.end();
+				break;
+			}
 		}
-
-		cplex.setParam(IloCplex::IntSolLim, IntegerSolutionLimit);*/
-		Solved = cplex.solve();
 	}
 	catch (IloException& ex)
 	{
@@ -207,509 +468,3 @@ double TwoPhase::GetUB()
 {
 	return Solved ? cplex.getBestObjValue() : DBL_MAX;
 }
-
-double TwoPhase::GetCallbackCPU()
-{
-	if (!Solved)
-		return 0;
-
-	double Total = 0;
-	for (auto& Worker : pCallback->workers)
-		Total += Worker->CPU;
-	return Total;
-}
-/*
-TwoPhaseCallback::TwoPhaseCallback(TwoPhase* pB) : pTwoPhase(pB)
-{
-	int nThreads = GetParameterValue(pTwoPhase->Parameters, "THREAD_COUNT");
-	workers.resize(nThreads);
-
-	for (int i = 0; i < nThreads; ++i)
-		workers[i] = new WorkerWW(pTwoPhase);
-}
-
-TwoPhaseCallback::~DTwoPhaseCallback()
-{}
-
-void TwoPhaseCallback::invoke(const IloCplex::Callback::Context& context)
-{
-	auto startTime = chrono::high_resolution_clock::now();
-
-	int const threadNo = context.getIntInfo(IloCplex::Callback::Context::Info::ThreadId);
-
-	// Get the right worker
-	auto& worker = workers[threadNo];
-
-	IloEnv env = context.getEnv();
-	IloNumArray zVal(env, pTwoPhase->PP.P);
-	IloNum thetaVal;
-
-	// Get the current z solution
-	switch (context.getId()) {
-	case IloCplex::Callback::Context::Id::Candidate:
-		if (!context.isCandidatePoint()) // The model is always bounded
-			throw IloCplex::Exception(-1, "Unbounded solution");
-		context.getCandidatePoint(pTwoPhase->z, zVal);
-		thetaVal = context.getCandidatePoint(pTwoPhase->Cost);
-		break;
-	case IloCplex::Callback::Context::Id::Relaxation:
-		context.getRelaxationPoint(pTwoPhase->z, zVal);
-		thetaVal = context.getRelaxationPoint(pDecomposition->Cost);
-		break;
-	case IloCplex::Callback::Context::Id::GlobalProgress:
-	{
-		double BestBound = context.getDoubleInfo(IloCplex::Callback::Context::Info::BestBound);
-		if (abs(BestBound) >= pDecomposition->BestBoundThreshold)
-		{
-			cout << "Aborting callback. BestBound: " << BestBound << " Threshold: " << pDecomposition->BestBoundThreshold << endl;
-			context.abort();
-		}
-		return;
-	}
-	default:
-		// Free memory
-		zVal.end();
-		throw IloCplex::Exception(-1, "Unexpected contextID");
-	}
-
-	IloExpr cutLhs(env);
-	double OptimalCost;
-	bool applyLifting = context.isCandidatePoint();
-	IloBool sepStat = worker->separate(pTwoPhase->PP, thetaVal, zVal, OptimalCost, cutLhs, applyLifting);
-
-	if (context.getId() == IloCplex::Callback::Context::Id::Candidate)
-	{
-		IloNum CandidateObjective = context.getCandidateObjective();
-		IloNum IncumbentObjective = context.getIncumbentObjective();
-		IloNum ActualCandidateObjective = CandidateObjective + thetaVal - OptimalCost;
-	}
-
-	zVal.end();
-
-	if (sepStat) {
-		// Add the cut
-		IloRange r(env, 0, cutLhs, IloInfinity);
-
-		switch (context.getId()) {
-		case IloCplex::Callback::Context::Id::Candidate:
-			context.rejectCandidate(r);
-			break;
-		case IloCplex::Callback::Context::Id::Relaxation:
-			if (OptimalCost - thetaVal > 1)
-			{
-				cout << r << endl;
-				context.addUserCut(r,
-					IloCplex::UseCutPurge,
-					IloFalse);
-			}
-			break;
-		default:
-			r.end();
-			throw IloCplex::Exception(-1, "Unexpected contextID");
-		}
-
-		{
-			unique_lock lock(pTwoPhase->Mutex);
-			pTwoPhase->GeneratedCuts.push_back(r);
-		}
-	}
-	++worker->CallCount;
-	if (sepStat)
-		++worker->CutCount;
-	worker->CPU += chrono::duration_cast<chrono::milliseconds>(chrono::high_resolution_clock::now() - startTime).count() / 1000.0;
-}
-
-Worker::Worker(TwoPhase* pB) : pTwoPhase(pB)
-{
-	CallCount = 0;
-	CutCount = 0;
-	CPU = 0;
-}
-
-WorkerWW::WorkerWW(TwoPhase* pB) : Worker(pB)
-{
-}
-
-bool WorkerWW::separate(ProductPeriods& PP, const IloNum thetaVal, const IloNumArray& zVal, double& OptimalCost, IloExpr& cutLhs, bool applyLifting)
-{
-	//int nSelected = 0;
-	DoubleVector Demand(PP.T, 0);
-	double TotalIndividualCost = 0;
-	double TotalConstantH = 0;
-	vector<bool> IsSelected(PP.P);
-	for (int m = 0; m < PP.P; ++m)
-	{
-		auto& Market = PP.Markets[m];
-
-		for (int t = 0; t < PP.T; ++t)
-			Demand[t] += Market.Demand[t] * zVal[m];
-	}
-
-	IntegerVector Ones(PP.T);
-	DoubleVector Duals(PP.T, 0);
-	double ConstantH;
-
-	int counter;
-
-	PP.WWgeneralPD(PP.T, Demand.data(), PP.SetupCost.data(), PP.ProductionCost.data(), PP.HoldingCost.data(), OptimalCost, Ones.data(), Duals.data(), ConstantH, counter);
-
-	for (auto d : Duals)
-	{
-		if (isnan(d) || isnan(ConstantH))
-		{
-			cout << "Numerical trouble detected" << endl;
-			PP.WWgeneralPD(MS.T, Demand.data(), PP.SetupCost.data(), PP.ProductionCost.data(), PP.HoldingCost.data(), OptimalCost, Ones.data(), Duals.data(), ConstantH, counter);
-			return false;
-		}
-	}
-
-	double check = 0;
-	if (OptimalCost > thetaVal + pTwoPhase->Epsilon)
-	{
-		cutLhs.clear();
-		cutLhs += pTwoPhase->Cost;
-
-		for (int m = 0; m < PP.P; ++m)
-		{
-			auto& Market = PP.Markets[m];
-			if (zVal[m] > pTwoPhase->Epsilon)
-			{
-				double Coefficient = 0;
-				for (int t = 0; t < PP.T; ++t)
-					Coefficient += Duals[t] * Market.Demand[t] * zVal[m];
-
-				cutLhs -= pTwoPhase->z[m] * Coefficient;
-				check += (zVal[m] * Coefficient);
-			}
-			else if (applyLifting)
-			{
-				// Apply lifting
-				cutLhs -= pTwoPhase->z[m] * (Market.VariableCost);
-			}
-		}
-
-		return true;
-	}
-	return false;
-}
-
-
-	int P = 2;
-	int T = 2;
-	int S = 4;
-	int M = 99;
-
-	vector<int> S_b;
-	S_b.resize(T);
-	//for (int t = 0; t < T; ++t)
-		//S_b[t] = 1;
-	S_b[0] = 0;
-	S_b[1] = 2;
-
-	vector<int> S_f;
-	S_f.resize(T);
-	//for (int t = 0; t < T; ++t)
-		//S_f[t] = 1;
-	S_f[0] = 2;
-	S_f[1] = 4;
-
-	vector<int> L;
-	L.resize(T);
-	//for (int t = 0; t < T; ++t)
-		//L[t] = 1;
-	L[0] = 1;
-	L[1] = 3;
-
-	vector<int> K;
-	K.resize(T);
-	for (int t = 0; t < T; ++t)
-		K[t] = 2;
-
-	vector<int> a;
-	a.resize(P);
-	for (int p = 0; p < P; ++p)
-		a[p] = 1;
-
-	vector<int> m;
-	m.resize(P);
-	//for (int p = 0; p < P; ++p)
-		//m[p] = 1;
-	m[0] = 1;
-	m[1] = 2;
-
-	vector<int> h;
-	h.resize(P);
-	for (int p = 0; p < P; ++p)
-		h[p] = 1;
-
-	Matrix s_pr;
-	s_pr.resize(P);
-	for (int p = 0; p < P; ++p)
-		s_pr[p].resize(P);
-
-	for (int p = 0; p < P; ++p)
-		for (int r = 0; r < P; ++r) {
-			s_pr[p][r] = 0;
-		}
-
-	Matrix d;
-	d.resize(P);
-	for (int p = 0; p < P; ++p)
-		d[p].resize(T);
-
-	//for (int p = 0; p < P; ++p)
-		//for (int t = 0; t < T; ++t) {
-			//d[p][t] = rand() % 11;
-		//}
-	d[0][0] = 1;
-	d[0][1] = 0;
-	d[1][0] = 0;
-	d[1][1] = 3;
-
-	vector<int> f;
-	f.resize(P);
-	for (int p = 0; p < P; ++p)
-		f[p] = 0;
-
-	vector<int> c;
-	c.resize(P);
-	for (int p = 0; p < P; ++p)
-		c[p] = 0;
-
-	// IP Model
-	clock_t startIP = clock(), finishIP; //Start clock for IP
-
-	IloEnv MPenv;
-	IloModel MPmodel(MPenv);
-
-	IloNumVar theta (MPenv, 0, IloInfinity);
-
-	NumVarArray2 I = CreateNumVarArray2(MPenv, P, T, "I", 0, IloInfinity);
-	NumVarArray2 q = CreateNumVarArray2(MPenv, P, T, "q", 0, IloInfinity);
-
-	BoolVarArray2 x = CreateBoolVarArray2(MPenv, P, T, "y");
-
-	IloExpr MPobj1(MPenv);
-	for (int p = 0; p < P; ++p)
-		for (int t = 0; t < T; ++t)
-			MPobj1 += (f[p] * x[p][t] + c[p] * q[p][t]);
-
-	IloExpr MPobj2(MPenv);
-	for (int p = 0; p < P; ++p)
-		for (int t = 0; t < T; ++t)
-			MPobj2 += h[p] * I[p][t];
-
-	IloExpr total_MPobj(MPenv);
-	total_MPobj = MPobj1 + MPobj2 + theta;
-
-	IloObjective MPobj = IloMinimize(MPenv, total_MPobj);
-	MPmodel.add(MPobj);
-
-	// Constraint (2)
-	for (int p = 0; p < P; ++p)
-		for (int t = 1; t < T; ++t) {
-			MPmodel.add(I[p][t] == I[p][t - 1] + q[p][t] - d[p][t]);
-		}
-
-	// Constraint (2.1)
-	for (int p = 0; p < P; ++p)
-		for (int t = 0; t < 1; ++t) {
-			MPmodel.add(I[p][t] == q[p][t] - d[p][t]);
-		}
-
-	// Constraint (3)
-	for (int t = 0; t < T; ++t) {
-		IloExpr Cap(MPenv);
-		for (int p = 0; p < P; ++p)
-			Cap += a[p] * q[p][t];
-		MPmodel.add(Cap <= K[t]);
-	}
-
-	// Constraint (4)
-	for (int t = 0; t < T; ++t)
-		for (int p = 0; p < P; ++p)
-			MPmodel.add(q[p][t] * a[p] <= K[t] * x[p][t]);
-
-	IloCplex MPcplex(MPmodel);
-
-	// Subproblem
-	IloEnv SPenv;
-	IloModel SPmodel(SPenv);
-
-	int J = IloSum(x);
-
-	vector<int> a;
-	a.resize(J + 1);
-	for (int j = 1; j < J; ++j)
-		a[j] = 1;
-	a[0] = 0;
-	a[4] = 0;
-
-	vector<int> b;
-	b.resize(J + 1);
-	//for (int j = 1; j < J; ++j)
-		//b[j] = 1;
-	b[0] = 0;
-	b[1] = 1;
-	b[2] = 2;
-	b[3] = 4;
-	b[4] = 99;
-
-	vector<int> h;
-	h.resize(J + 1);
-	for (int j = 1; j < J; ++j)
-		h[j] = 1;
-	h[0] = 0;
-	h[4] = 0;
-
-	Matrix setup;
-	setup.resize(J + 1);
-	for (int j = 0; j < J + 1; ++j)
-		setup[j].resize(J + 1);
-
-	for (int j = 0; j < J + 1; ++j)
-		for (int l = 0; l < J + 1; ++l) {
-			setup[j][l] = 0;
-		}
-
-	IloNumVarArray C = CreateNumVarArray(SPenv, J + 1, "C", 0, IloInfinity);
-
-	BoolVarArray2 e = CreateBoolVarArray2(SPenv, J + 1, J + 1, "e");
-
-	IloExpr SPobj2(SPenv);
-	for (int j = 0; j < J; ++j)
-		for (int l = 1; l < J; ++l)
-			if (j != l)
-				SPobj2 += setup[j][l] * e[j][l];
-
-	IloObjective SPobj = IloMinimize(SPenv, SPobj2);
-	SPmodel.add(SPobj);
-
-	IloCplex SPcplex(SPmodel);
-
-	// Constraint (2)
-	for (int j = 0; j < J; ++j) {
-		IloExpr Each1(SPenv);
-		for (int l = 1; l < J + 1; ++l)
-			if (j != l)
-				Each1 += e[j][l];
-		SPmodel.add(Each1 == 1);
-	}
-
-	// Constraint (3)
-	for (int j = 1; j < J + 1; ++j) {
-		IloExpr Each2(SPenv);
-		for (int l = 1; l < J + 1; ++l)
-			if (j != l)
-				Each2 += e[l][j];
-		SPmodel.add(Each2 == 1);
-	}
-
-	// Constraint (4)
-	for (int j = 0; j < J; ++j)
-		for (int l = 1; l < J + 1; ++l)
-			SPmodel.add(C[j] + q_hat[l] * a[l] <= C[l] + M * (1 - e[j][l]));
-
-	// Constraint (5)
-	for (int j = 1; j < J; ++j)
-		SPmodel.add(C[j] <= b[j]);
-
-	SPmodel.add(C[0] == 0);
-
-	//Deactivate Presolve operations and use Primal 
-	//SPcplex.setParam(IloCplex::Param::Preprocessing::Reduce, 0);
-	//SPcplex.setParam(IloCplex::Param::RootAlgorithm, IloCplex::Primal);
-
-	//Benders Algorithm
-	clock_t startB = clock(), finishB; //Start clock for Benders Decomposition
-	int iter = 0;
-	//int feas_cut = 0;
-	int opt_cut = 0;
-	double UB = 0;
-	//double UB_best = w * Rectangles.size() + b_sum;// 9999999;
-	while (true)
-	{
-		iter += 1;
-		// Solve Master Problem
-		MPcplex.exportModel("MP_GLSP.lp");
-		bool result = MPcplex.solve();
-
-		double theta_hat = MPcplex.getValue(theta);
-		double x_hat = 0;
-		for (int p = 0; p < P; ++p)
-			for (int t = 0; t < T; ++t)
-				x_hat += MPcplex.getValue(x[p][t]);
-
-		if (result && MPcplex.isPrimalFeasible())
-		{
-
-			//Solve subproblem
-			SPcplex.exportModel("SP_GLSP.lp");
-			bool resultSP = SPcplex.solve();
-
-			double nu_hat = SPcplex.getObjValue();
-
-			cout << SPcplex.getCplexStatus() << endl;
-			// Optimal solution
-			if (nu_hat <= theta_hat)
-			{
-				finishB = clock(); //Stop clock for Benders Decomposition
-				cout << "Optimal solution found " << endl;
-				cout << MPcplex.getObjValue() << endl;
-				cout << "Number of iterations " << iter << endl;
-				cout << "Number of optimality cuts " << opt_cut << endl;
-				cout << "Time Spent for Benders Decomposition = " << (float)(finishB - startB) / CLOCKS_PER_SEC << endl;
-				cout << "Benders objective " << MPcplex.getObjValue() << endl;
-
-				//cout << "IP bound " << IPcplex.getBestObjValue() << endl;
-				//cout << "IP objective " << IPcplex.getObjValue() << endl;
-				//cout << "IP gap " << IPcplex.getMIPRelativeGap() << endl;
-				//cout << "Time Spent for IP = " << (float)(finishIP - startIP) / CLOCKS_PER_SEC << endl;
-
-					break;
-			}
-			//Add optimality cut to Master Problem
-			else 
-			{
-				opt_cut += 1;
-				IloExpr Sum1(MPenv);
-				for (int p = 0; p < P; ++p)
-					for (int t = 0; t < T; ++t)
-					{
-						Sum1 += x[p][t];
-					}
-				IloExpr Sum2(MPenv);
-				for (int p = 0; p < P; ++p)
-					for (int t = 0; t < T; ++t)
-					{
-						Sum2 += x[p][t];
-					}
-
-				IloExpr OptCut(MPenv);
-				OptCut = Sum1 - Sum2;
-
-				MPmodel.add(theta >= theta_hat * OptCut - theta_hat * (F - 1));
-			}
-		}
-		finishB = clock(); //Stop clock for Benders Decomposition
-		// Time limit exceeded... STOP
-		if ((float)(finishB - startB) / CLOCKS_PER_SEC > 900)
-		{
-			bool result1 = MPcplex.solve();
-			cout << "Time limit exceeded..." << endl;
-			cout << "Number of iterations " << iter << endl;
-			cout << "Number of optimality cuts " << opt_cut << endl;
-			cout << "Time Spent for Benders Decomposition = " << (float)(finishB - startB) / CLOCKS_PER_SEC << endl;
-			cout << "Lower bound " << MPcplex.getObjValue() << endl;
-
-			//cout << "IP bound " << IPcplex.getBestObjValue() << endl;
-			//cout << "IP objective " << IPcplex.getObjValue() << endl;
-			//cout << "IP gap " << IPcplex.getMIPRelativeGap() << endl;
-			//cout << "Time Spent for IP = " << (float)(finishIP - startIP) / CLOCKS_PER_SEC << endl;
-
-			break;
-		}
-
-	}
-	return 0;
-	*/

@@ -19,17 +19,23 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\BSP-1.cpp" />
     <ClCompile Include="..\Common.cpp" />
     <ClCompile Include="..\DataPrep.cpp" />
-    <ClCompile Include="..\GLSP-1.cpp" />
     <ClCompile Include="..\GLSP_gen.cpp" />
     <ClCompile Include="..\main.cpp" />
+    <ClCompile Include="..\setupDP.cpp" />
+    <ClCompile Include="..\Subproblems.cpp" />
+    <ClCompile Include="..\TwoPhase.cpp" />
+    <ClCompile Include="..\TwoPhase_Callback.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\Common.h" />
     <ClInclude Include="..\DataPrep.h" />
     <ClInclude Include="..\GLSP_gen.h" />
+    <ClInclude Include="..\setupDP.h" />
+    <ClInclude Include="..\Subproblems.h" />
+    <ClInclude Include="..\TwoPhase.h" />
+    <ClInclude Include="..\TwoPhase_Callback.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectName>GLSP</ProjectName>
@@ -132,13 +138,14 @@
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>C:\Program Files\IBM\ILOG\CPLEX_Studio201\cplex\include;C:\Program Files\IBM\ILOG\CPLEX_Studio201\concert\include;C:\Program Files\IBM\ILOG\CPLEX_Studio_Community2211\cplex\include;C:\Program Files\IBM\ILOG\CPLEX_Studio_Community2211\concert\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;IL_STD;%(PreprocessorDefinitions);_SCL_SECURE_NO_WARNINGS</PreprocessorDefinitions>
-      <MinimalRebuild>true</MinimalRebuild>
+      <MinimalRebuild>false</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <PrecompiledHeader />
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <DisableSpecificWarnings>4267;4244;4996</DisableSpecificWarnings>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <AdditionalDependencies>ilocplex.lib;concert.lib;cplex2010.lib;cplex2211.lib;%(AdditionalDependencies)</AdditionalDependencies>
