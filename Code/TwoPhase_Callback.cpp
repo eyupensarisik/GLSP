@@ -262,14 +262,8 @@ void TwoPhaseCallback::invoke(const IloCplex::Callback::Context& context)
 	IloExpr GMCut(env);
 	double OptimalCost;
 
-	Expr_vec cutDPs;
-	cutDPs.resize(pTwoPhaseC->PP.T);
 
-	Expr_vec DPCut;
-	DPCut.resize(pTwoPhaseC->PP.T);
-
-
-	IloBool sepStat = worker->separate(pTwoPhaseC->PP, pTwoPhaseC->Parameters, pTwoPhaseC->LB_theta, thetaVal, xVal, OptimalCost, cutLhs, cutDPs, cutGMs, Sum1, Sum2, DPCut, GMCut);
+	IloBool sepStat = worker->separate(pTwoPhaseC->PP, pTwoPhaseC->Parameters, pTwoPhaseC->LB_theta, thetaVal, xVal, OptimalCost, cutLhs, cutGMs, Sum1, Sum2, GMCut);
 
 	if (context.getId() == IloCplex::Callback::Context::Id::Candidate)
 	{
@@ -302,25 +296,6 @@ void TwoPhaseCallback::invoke(const IloCplex::Callback::Context& context)
 			pTwoPhaseC->GeneratedCuts.push_back(r);
 			//pTwoPhaseC->GeneratedCuts.push_back(rr);
 		}
-		/*
-		for (int t = 0; t < pTwoPhaseC->PP.T; ++t){
-			IloRange rrr(env, 0, cutDPs[t], IloInfinity);
-
-			switch (context.getId()) {
-			case IloCplex::Callback::Context::Id::Candidate:
-				context.rejectCandidate(rrr);
-
-				break;
-			default:
-				rrr.end();
-				throw IloCplex::Exception(-1, "Unexpected contextID");
-			}
-
-			{
-				std::unique_lock<std::mutex> lock(pTwoPhaseC->Mutex);
-				pTwoPhaseC->GeneratedCuts.push_back(rrr);
-			}
-		}*/
 	}
 	++worker->CallCount;
 	if (sepStat)
@@ -339,7 +314,7 @@ WorkerWW::WorkerWW(TwoPhaseC* pB) : Worker(pB)
 {
 }
 
-bool WorkerWW::separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_theta, const IloNum thetaVal, const NumArray2& xVal, double& OptimalCost, IloExpr& cutLhs, Expr_vec& cutDPs, IloExpr& cutGMs, IloExpr& Sum1, IloExpr& Sum2, Expr_vec& DPCut, IloExpr& GMCut)
+bool WorkerWW::separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_theta, const IloNum thetaVal, const NumArray2& xVal, double& OptimalCost, IloExpr& cutLhs, IloExpr& cutGMs, IloExpr& Sum1, IloExpr& Sum2, IloExpr& GMCut)
 {
 	int W = 0;
 	for (int p = 0; p < pTwoPhaseC->PP.P; ++p)
@@ -400,8 +375,6 @@ bool WorkerWW::separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_th
 	{
 		cutLhs.clear();
 		cutGMs.clear();
-		//for (int t = 0; t < PP.T; ++t)
-			//cutDPs[t].clear();
 
 		vector<int> SP_Sol;
 		SP_Sol.resize(W);
@@ -499,9 +472,9 @@ bool WorkerWW::separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_th
 		for (int t = 0; t < PP.T; ++t) {
 			for (int p = 0; p < PP.P; ++p) {
 				if (x_val[p][t] >= 0.5)
-					LBsetup[t];//DPCut[t] += (LBsetup[t] - LBsetupPermin[t]) * (1 - pTwoPhaseC->x[p][t]);
+					LBsetup[t];//DPCut += (LBsetup[t] - LBsetupPermin[t]) * (1 - pTwoPhaseC->x[p][t]);
 			}
-			//cutDPs[t] -= (pTwoPhaseC->theta_t[t] >= LBsetup[t] - DPCut[t]);
+			//cutDPs -= (pTwoPhaseC->theta_t[t] >= LBsetup[t] - DPCut);
 		}
 
 		double LBsetuptotal = 0;

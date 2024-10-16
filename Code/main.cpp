@@ -12,7 +12,7 @@ using namespace std::chrono;
 
 int main(int nParams, char* params[])
 {
-	string inputFileName = (nParams > 1 ? params[1] : "../../Data/SingleMachineCapVar2/Data1-15-15-0.6-0.5-100-100-100-2.dat");
+	string inputFileName = (nParams > 1 ? params[1] : "../../Data/SingleMachineCapVar2/Data1-15-15-0.6-0.5-100-100-100-0.dat");
 	string inputFileNameOnly;
 
 	auto fileNameBegin = inputFileName.find_last_of("/\\");
@@ -30,7 +30,7 @@ int main(int nParams, char* params[])
 	string outputFileName = (nParams > 2 ? params[2] : inputFileNameOnly + "_result.csv");
 	string summaryFileName = (nParams > 3 ? params[3] : "summary.csv");
 
-	string parameterFileName = (nParams > 4 ? params[4] : "../Run/Parameters/TwoPhase_Callback.txt");
+	string parameterFileName = (nParams > 4 ? params[4] : "../Run/Parameters/TwoPhase.txt");
 
 	int pOverride = 3;// stoi((nParams > 5 ? params[5] : "0"));
 	int tOverride = 3;//stoi((nParams > 6 ? params[6] : "0"));

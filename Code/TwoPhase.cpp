@@ -117,7 +117,7 @@ void TwoPhase::SetupModel()
 	SP.BSP_Solve();
 
 	LB_theta = SP.GetBSP_UB();
-	//MPmodel.add(theta >= LB_theta);
+	model.add(theta >= LB_theta);
 
 	IloExpr thetaCut(env);
 	for (int t = 0; t < PP.T; ++t)
