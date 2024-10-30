@@ -19,7 +19,8 @@ T,^
 TwoPhase_Iter,^
 TwoPhase_Cut,^
 TwoPhase_CPU,^
-TwoPhase_Obj,^
+TwoPhase_UB,^
+TwoPhase_LB,^
 MP_CPU,^
 SP_Cons_CPU,^
 SP_Solve_CPU,^

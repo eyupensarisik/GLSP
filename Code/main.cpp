@@ -12,7 +12,7 @@ using namespace std::chrono;
 
 int main(int nParams, char* params[])
 {
-	string inputFileName = (nParams > 1 ? params[1] : "../../Data/SingleMachineCapVar2/Data1-15-15-0.6-0.5-100-100-100-0.dat");
+	string inputFileName = (nParams > 1 ? params[1] : "../../Data/SingleMachineCapVar2/Data1-15-15-0.6-0.5-100-100-100-2.dat");
 	string inputFileNameOnly;
 
 	auto fileNameBegin = inputFileName.find_last_of("/\\");
@@ -33,7 +33,7 @@ int main(int nParams, char* params[])
 	string parameterFileName = (nParams > 4 ? params[4] : "../Run/Parameters/TwoPhase.txt");
 
 	int pOverride = 3;// stoi((nParams > 5 ? params[5] : "0"));
-	int tOverride = 3;//stoi((nParams > 6 ? params[6] : "0"));
+	int tOverride = 3;// stoi((nParams > 6 ? params[6] : "0"));
 
 	ParameterMap Parameters;
 	ReadParameterMapFromFile(Parameters, parameterFileName);
@@ -57,7 +57,7 @@ int main(int nParams, char* params[])
 		}
 		else if (GetParameterValue(Parameters, "TWO_PHASE"))
 		{
-			summaryFile << "Name,P,T,TwoPhase_Iter,TwoPhase_Cut,TwoPhase_CPU,TwoPhase_Obj,MP_CPU,SP_Cons_CPU,SP_Solve_CPU" << endl;
+			summaryFile << "Name,P,T,TwoPhase_Iter,TwoPhase_Cut,TwoPhase_CPU,TwoPhase_UB,TwoPhase_LB,MP_CPU,SP_Cons_CPU,SP_Solve_CPU" << endl;
 		}
 		else if (GetParameterValue(Parameters, "TWO_PHASE_CALLBACK"))
 		{
@@ -155,14 +155,15 @@ int main(int nParams, char* params[])
 			double TwoPhase_Iter;
 			double MP_CPU = 0;
 			double TwoPhase_CPU = 0;
-			double TwoPhase_Obj = 0;
+			double TwoPhase_UB = 0;
+			double TwoPhase_LB = 0;
 			double TwoPhase_Cut = 0;
 			double SP_Cons_CPU = 0;
 			double SP_Solve_CPU = 0;
 
 			cout << "Started solving TwoPhase" << endl;
 			tp.SetupModel();
-			tp.Solve(timeLimit, &TwoPhase_Iter, &TwoPhase_Cut, &TwoPhase_CPU, &TwoPhase_Obj, &SP_Cons_CPU, &SP_Solve_CPU, &MP_CPU);
+			tp.Solve(timeLimit, &TwoPhase_Iter, &TwoPhase_Cut, &TwoPhase_CPU, &TwoPhase_LB, &TwoPhase_UB, &SP_Cons_CPU, &SP_Solve_CPU, &MP_CPU);
 			cout << "Finished solving TwoPhase. UB: " << tp.GetUB() << " LB: " << tp.GetLB() << endl;
 
 			if (summaryFile)
@@ -173,7 +174,8 @@ int main(int nParams, char* params[])
 					<< TwoPhase_Iter << ","
 					<< TwoPhase_Cut << ","
 					<< TwoPhase_CPU << ","
-					<< TwoPhase_Obj << ","
+					<< TwoPhase_UB << ","
+					<< TwoPhase_LB << ","
 					<< MP_CPU << ","
 					<< SP_Cons_CPU << ","
 					<< SP_Solve_CPU << endl;

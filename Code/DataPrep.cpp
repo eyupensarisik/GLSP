@@ -158,16 +158,10 @@ void ProductPeriods::ReadData(ifstream& file)
 	}
 	for (int t = 0; t < T; ++t)
 		cout << "Value of L[" << t << "] is " << L[t] << endl;
-	*/
-	vector<int> cap;
-	cap.resize(T);
-	cap = { 716, 715, 702, 735, 723, 752, 794, 738, 736, 743, 799, 705, 894, 792, 767 };
-
-	for (int t = 0; t < T; ++t)
-		K[t] = cap[t];
 	
 	for (int t = 0; t < T; ++t)
 		cout << "Value of K[" << t << "] is " << K[t] << endl;
+	*/
 }
 
 string to_string(const IntegerVector& vect)

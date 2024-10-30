@@ -1,2 +1,1 @@
-Name,P,T,TwoPhase_Iter,TwoPhase_Cut,TwoPhase_CPU,TwoPhase_Obj,MP_CPU,SP_Cons_CPU,SP_Solve_CPU
-Data1-15-15-0.6-0.5-100-100-100-0_result.csv,3,3,4,3,1.108,2384,0.736,0.008,0.364
+Name,P,T,TwoPhase_Iter,TwoPhase_Cut,TwoPhase_CPU,TwoPhase_UB,TwoPhase_LB,MP_CPU,SP_Cons_CPU,SP_Solve_CPU

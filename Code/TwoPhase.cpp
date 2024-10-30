@@ -21,6 +21,14 @@ TwoPhase::~TwoPhase()
 void TwoPhase::SetupModel()
 {
 	// Setup Master Problem
+	Matrix setup_pr;
+	setup_pr.resize(PP.P);
+	for (int p = 0; p < PP.P; ++p)
+		setup_pr[p].resize(PP.P);
+
+	for (int p = 0; p < PP.P; ++p)
+		for (int r = 0; r < PP.P; ++r)
+			setup_pr[p][r] = PP.Products[p].s_pr[r];
 
 	theta = IloNumVar(env, 0, IloInfinity, "theta");
 	gamma = IloNumVar(env, 0, IloInfinity, "gamma");
@@ -119,6 +127,28 @@ void TwoPhase::SetupModel()
 	LB_theta = SP.GetBSP_UB();
 	model.add(theta >= LB_theta);
 
+	double ValIn_setup = 0;
+	IloExpr ValIn(env);
+
+	setupDP sDP;
+	map <pair<int, set<int>>, int> Cache;
+	set<int> current;
+	for (int t = 0; t < PP.T; ++t){
+		for (int p = 0; p < PP.P; ++p)
+			if (PP.Products[p].d[t] > 0)
+				current.insert(p);
+
+		if (!current.empty()) {
+			cout << "Finding minimum setup" << endl;
+			ValIn_setup = sDP.MinSetup(Cache, setup_pr, -1, current);
+			cout << "Done. Minimum setup: " << ValIn_setup << endl;
+		}
+
+		ValIn += theta_t[t];
+
+		model.add(ValIn >= ValIn_setup);
+	}
+
 	IloExpr thetaCut(env);
 	for (int t = 0; t < PP.T; ++t)
 		thetaCut += theta_t[t];
@@ -129,7 +159,7 @@ void TwoPhase::SetupModel()
 
 }
 
-bool TwoPhase::Solve(double timeLimit, double* TwoPhase_Iter, double* TwoPhase_Cut, double* TwoPhase_CPU, double* TwoPhase_Obj, double* SP_Cons_CPU, double* SP_Solve_CPU, double* MP_CPU)
+bool TwoPhase::Solve(double timeLimit, double* TwoPhase_Iter, double* TwoPhase_Cut, double* TwoPhase_CPU, double* TwoPhase_UB, double* TwoPhase_LB, double* SP_Cons_CPU, double* SP_Solve_CPU, double* MP_CPU)
 {	
 	cplex.setParam(IloCplex::ClockType, 2);
 	auto startTime = chrono::high_resolution_clock::now();
@@ -146,6 +176,7 @@ bool TwoPhase::Solve(double timeLimit, double* TwoPhase_Iter, double* TwoPhase_C
 		double iter = 0;
 		double opt_cut = 0;
 		double UB = 0;
+		double UB_best = INT_MAX;
 		double SPtime = 0;
 		double TotalSPtime = 0;
 		double TotalSPcons_time = 0;
@@ -240,8 +271,16 @@ bool TwoPhase::Solve(double timeLimit, double* TwoPhase_Iter, double* TwoPhase_C
 				double nu_hat = SP.GetBSP_UB();
 				SP.GetBSP_Solutions(W);
 
+				UB = cplex.getObjValue() - theta_hat + nu_hat;
+				if (UB <= UB_best)
+					UB_best = UB;
+
+				for (int t = 0; t < PP.T; ++t)
+					cout << cplex.getValue(theta_t[t]) << endl;
+				cout << cplex.getValue(gamma) << endl;
+
 				// Optimal solution
-				if (nu_hat <= theta_hat)
+				if (nu_hat <= theta_hat + 0.0001)
 				{
 					Solved = 1;
 					cplex.exportModel("MP_GLSP.lp");
@@ -276,7 +315,8 @@ bool TwoPhase::Solve(double timeLimit, double* TwoPhase_Iter, double* TwoPhase_C
 					*TwoPhase_Iter = iter;
 					*TwoPhase_Cut = opt_cut;
 					*TwoPhase_CPU = (float)TPtime.count() / 1000;
-					*TwoPhase_Obj = cplex.getObjValue();
+					*TwoPhase_UB = cplex.getObjValue();
+					*TwoPhase_LB = cplex.getBestObjValue();
 					*SP_Cons_CPU = (float)TotalSPcons_time / 1000;
 					*SP_Solve_CPU = (float)TotalSPtime / 1000;
 					*MP_CPU = *TwoPhase_CPU - *SP_Cons_CPU - *SP_Solve_CPU;
@@ -303,6 +343,63 @@ bool TwoPhase::Solve(double timeLimit, double* TwoPhase_Iter, double* TwoPhase_C
 							SP_Sol[i] = j;
 							i += 1;
 						}
+
+					int LB = 0;
+					for (int i = 0; i < W - 1; ++i)
+						LB += SP.SP_setup[SP_Sol[i]][SP_Sol[i + 1]];
+
+					for (int k = 0; k < W; ++k) {
+						SP_Sol2 = SP_Sol;
+						SP_Sol2.erase(SP_Sol2.begin() + k);
+						int LBs = 0;
+						for (int i = 0; i < W - 2; ++i)
+							LBs += SP.SP_setup[SP_Sol2[i]][SP_Sol2[i + 1]];
+
+						if (LBs < LB)
+							LB = LBs;
+					}
+
+					int set_mins = 0;
+					int set_min = 0;
+					vector<int> set_min_p;
+					set_min_p.resize(PP.P);
+
+					for (int p = 0; p < PP.P; ++p) {
+						int set_mins = 999999;
+						int set_min = 999999;
+						for (int r = 0; r < PP.P; ++r) {
+							if (p != r)
+								set_mins = PP.Products[p].s_pr[r];
+
+							if (set_mins < set_min)
+								set_min = set_mins;
+						}
+						set_min_p[p] = set_min;
+					}
+
+					vector<int> set_min_total;
+					set_min_total.resize(W);
+
+					for (int k = 0; k < W; ++k) {
+						int kk = 0;
+						for (int t = 0; t < PP.T; ++t) {
+							int set_min_max = 0;
+							for (int p = 0; p < PP.P; ++p) {
+								if (cplex.getValue(x[p][t]) >= 0.5) {
+									if (kk != k) {
+										set_min_total[k] += set_min_p[p];
+
+										if (set_min_p[p] > set_min_max)
+											set_min_max = set_min_p[p];
+									}
+									kk += 1;
+								}
+							}
+							set_min_total[k] -= set_min_max;
+						}
+					}
+
+					LB = *min_element(set_min_total.begin(), set_min_total.end());
 
 					//DP implementation
 					setupDP sDP;
@@ -374,6 +471,9 @@ bool TwoPhase::Solve(double timeLimit, double* TwoPhase_Iter, double* TwoPhase_C
 							if (LBsetupPer[p][t] < LBsetupPermin[t])
 								LBsetupPermin[t] = LBsetupPer[p][t];
 
+					if (LB < LB_theta)
+						LB = LB_theta;
+
 					IloExpr Sum1(env);
 					for (int j = 1; j < W + 1; ++j)
 						Sum1 += x[wp[j]][wt[j]];
@@ -392,7 +492,7 @@ bool TwoPhase::Solve(double timeLimit, double* TwoPhase_Iter, double* TwoPhase_C
 						IloExpr DPCut(env);
 						for (int p = 0; p < PP.P; ++p) {
 							if (x_val[p][t] >= 0.5) 
-								DPCut += (LBsetup[t] - LBsetupPermin[t]) * (1 - x[p][t]);
+								DPCut += (LBsetup[t]) * (1 - x[p][t]);
 						}
 						model.add(theta_t[t] >= LBsetup[t] - DPCut);
 					}
@@ -415,7 +515,7 @@ bool TwoPhase::Solve(double timeLimit, double* TwoPhase_Iter, double* TwoPhase_C
 					
 					model.add(gamma >= LBresidual - GMCut);
 
-					model.add(theta >= (nu_hat - LB_theta) * Sum1 - (nu_hat - LB_theta) * (W - 1) + LB_theta);
+					model.add(theta >= (nu_hat - LB) * Sum1 - (nu_hat - LB) * (W - 1) + LB);
 
 				}
 				SP.SPmodel.end();
@@ -428,19 +528,21 @@ bool TwoPhase::Solve(double timeLimit, double* TwoPhase_Iter, double* TwoPhase_C
 			auto finishB = chrono::high_resolution_clock::now();
 			auto Btime = chrono::duration_cast<chrono::milliseconds>(finishB - startTP);
 			// Time limit exceeded... STOP
-			if (Btime.count() / 1000 > 600)
+			if (Btime.count() / 1000 > timeLimit)
 			{
 				bool result1 = cplex.solve();
 				cout << "Time limit exceeded..." << endl;
 				cout << "Number of iterations " << iter << endl;
 				cout << "Number of optimality cuts " << opt_cut << endl;
 				cout << "Time Spent for TwoPhase Decomposition = " << (float)Btime.count() / 1000 << endl;
-				cout << "Lower bound " << cplex.getObjValue() << endl;
+				cout << "Lower bound " << cplex.getBestObjValue() << endl;
+				cout << "Upper bound " << UB_best << endl;
 
 				*TwoPhase_Iter = iter;
 				*TwoPhase_Cut = opt_cut;
 				*TwoPhase_CPU = (float)Btime.count() / 1000;
-				*TwoPhase_Obj = cplex.getObjValue();
+				*TwoPhase_UB = UB_best;
+				*TwoPhase_LB = cplex.getBestObjValue();
 				*SP_Cons_CPU = (float)TotalSPcons_time / 1000;
 				*SP_Solve_CPU = (float)TotalSPtime / 1000;
 				*MP_CPU = *TwoPhase_CPU - *SP_Cons_CPU - *SP_Solve_CPU;
