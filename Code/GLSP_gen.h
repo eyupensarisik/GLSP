@@ -21,7 +21,7 @@ class GLSP
 	NumVarArray2 q; //Amount of product p produced in micro-period s
 
 	BoolVarArray2 y; //1, if the machine is prepared for the product p in micro-period s; 0, otherwise
-	NumVarArray3 z; //1 if the transition from product p to r occurs at the beginning of micro - period s; 0 otherwise
+	BoolVarArray3 z; //1 if the transition from product p to r occurs at the beginning of micro - period s; 0 otherwise
 
 
 public:
@@ -34,6 +34,8 @@ public:
 	double GetLB();
 	double GetUB();
 	double GetGap();
+	int GetConsts();
+	int GetVars();
 	void GetSolutions(int SolP, int SolT, int S);
 };
 #endif

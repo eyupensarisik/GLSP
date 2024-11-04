@@ -7,7 +7,6 @@
 #include <numeric>
 
 typedef vector<vector<double>> Matrix;
-typedef vector<IloExpr> Expr_vec;
 
 TwoPhaseC::TwoPhaseC(ProductPeriods& PPIn, ParameterMap& PM) : PP(PPIn), Parameters(PM), model(env), cplex(env)
 {
@@ -23,6 +22,15 @@ void TwoPhaseC::SetupModel()
 {
 	// Setup Master Problem
 
+	Matrix setup_pr;
+	setup_pr.resize(PP.P);
+	for (int p = 0; p < PP.P; ++p)
+		setup_pr[p].resize(PP.P);
+
+	for (int p = 0; p < PP.P; ++p)
+		for (int r = 0; r < PP.P; ++r)
+			setup_pr[p][r] = PP.Products[p].s_pr[r];
+
 	theta = IloNumVar(env, 0, IloInfinity, "theta");
 	gamma = IloNumVar(env, 0, IloInfinity, "gamma");
 	theta_t = CreateNumVarArray(env, PP.T, "theta_t", 0, IloInfinity);
@@ -34,6 +42,9 @@ void TwoPhaseC::SetupModel()
 
 	theta.setStringProperty("Type", "theta");
 	theta.setIntProperty("Product", -1);
+
+	gamma.setStringProperty("Type", "gamma");
+	gamma.setIntProperty("Product", -1);
 
 	for (int p = 0; p < PP.P; ++p)
 		for (int t = 0; t < PP.T; ++t)
@@ -118,7 +129,29 @@ void TwoPhaseC::SetupModel()
 	SP.BSP_Solve();
 
 	LB_theta = SP.GetBSP_UB();
-	//MPmodel.add(theta >= LB_theta);
+	model.add(theta >= LB_theta);
+
+	double ValIn_setup = 0;
+	IloExpr ValIn(env);
+
+	setupDP sDP;
+	map <pair<int, set<int>>, int> Cache;
+	set<int> current;
+	for (int t = 0; t < PP.T; ++t) {
+		for (int p = 0; p < PP.P; ++p)
+			if (PP.Products[p].d[t] > 0)
+				current.insert(p);
+
+		if (!current.empty()) {
+			//cout << "Finding minimum setup" << endl;
+			ValIn_setup = sDP.MinSetup(Cache, setup_pr, -1, current);
+			//cout << "Done. Minimum setup: " << ValIn_setup << endl;
+		}
+
+		ValIn += theta_t[t];
+
+		model.add(ValIn >= ValIn_setup);
+	}
 
 	IloExpr thetaCut(env);
 	for (int t = 0; t < PP.T; ++t)
@@ -162,12 +195,12 @@ bool TwoPhaseC::Solve(double timeLimit)
 
 double TwoPhaseC::GetLB()
 {
-	return Solved ? cplex.getObjValue() : 0;
+	return Solved ? cplex.getBestObjValue() : 0;
 }
 
 double TwoPhaseC::GetUB()
 {
-	return Solved ? cplex.getBestObjValue() : DBL_MAX;
+	return Solved ? cplex.getObjValue() : DBL_MAX;
 }
 
 double TwoPhaseC::GetCallbackCPU()
@@ -257,13 +290,21 @@ void TwoPhaseCallback::invoke(const IloCplex::Callback::Context& context)
 
 	IloExpr cutLhs(env);
 	IloExpr cutGMs(env);
+	IloExprArray cutDPs(env, pTwoPhaseC->PP.T);
+	for (int t = 0; t < pTwoPhaseC->PP.T; ++t)
+		cutDPs[t] = IloExpr(env);
+
 	IloExpr Sum1(env);
 	IloExpr Sum2(env);
 	IloExpr GMCut(env);
+	IloExprArray DPCut(env, pTwoPhaseC->PP.T);
+	for (int t = 0; t < pTwoPhaseC->PP.T; ++t)
+		DPCut[t] = IloExpr(env);
+
 	double OptimalCost;
 
 
-	IloBool sepStat = worker->separate(pTwoPhaseC->PP, pTwoPhaseC->Parameters, pTwoPhaseC->LB_theta, thetaVal, xVal, OptimalCost, cutLhs, cutGMs, Sum1, Sum2, GMCut);
+	IloBool sepStat = worker->separate(pTwoPhaseC->PP, pTwoPhaseC->Parameters, pTwoPhaseC->LB_theta, thetaVal, xVal, OptimalCost, cutLhs, cutGMs, Sum1, Sum2, GMCut, DPCut, cutDPs);
 
 	if (context.getId() == IloCplex::Callback::Context::Id::Candidate)
 	{
@@ -276,25 +317,30 @@ void TwoPhaseCallback::invoke(const IloCplex::Callback::Context& context)
 
 	if (sepStat) {
 		// Add the cut
-		IloRange r(env, 0, cutLhs, IloInfinity);
-		//IloRange rr(env, 0, cutGMs, IloInfinity);
+		IloRange Lshaped_r(env, 0, cutLhs, IloInfinity);
+		IloRange GM_r(env, 0, cutGMs, IloInfinity);
+		IloRangeArray DP_r(env, 0, cutDPs, IloInfinity);
 
 		switch (context.getId()) {
 		case IloCplex::Callback::Context::Id::Candidate:
-			context.rejectCandidate(r);
-			//context.rejectCandidate(rr);
+			context.rejectCandidate(Lshaped_r);
+			context.rejectCandidate(GM_r);
+			context.rejectCandidate(DP_r);
 
 			break;
 		default:
-			r.end();
-			//rr.end();
+			Lshaped_r.end();
+			GM_r.end();
+			DP_r.end();
 			throw IloCplex::Exception(-1, "Unexpected contextID");
 		}
 
 		{
 			std::unique_lock<std::mutex> lock(pTwoPhaseC->Mutex);
-			pTwoPhaseC->GeneratedCuts.push_back(r);
-			//pTwoPhaseC->GeneratedCuts.push_back(rr);
+			pTwoPhaseC->GeneratedCuts.push_back(Lshaped_r);
+			pTwoPhaseC->GeneratedCuts.push_back(GM_r);
+			for (int t = 0; t < pTwoPhaseC->PP.T; ++t)
+				pTwoPhaseC->GeneratedCuts.push_back(DP_r[t]);
 		}
 	}
 	++worker->CallCount;
@@ -314,7 +360,7 @@ WorkerWW::WorkerWW(TwoPhaseC* pB) : Worker(pB)
 {
 }
 
-bool WorkerWW::separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_theta, const IloNum thetaVal, const NumArray2& xVal, double& OptimalCost, IloExpr& cutLhs, IloExpr& cutGMs, IloExpr& Sum1, IloExpr& Sum2, IloExpr& GMCut)
+bool WorkerWW::separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_theta, const IloNum thetaVal, const NumArray2& xVal, double& OptimalCost, IloExpr& cutLhs, IloExpr& cutGMs, IloExpr& Sum1, IloExpr& Sum2, IloExpr& GMCut, IloExprArray& DPCut, IloExprArray& cutDPs)
 {
 	int W = 0;
 	for (int p = 0; p < pTwoPhaseC->PP.P; ++p)
@@ -375,6 +421,7 @@ bool WorkerWW::separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_th
 	{
 		cutLhs.clear();
 		cutGMs.clear();
+		//cutDPs.clear();
 
 		vector<int> SP_Sol;
 		SP_Sol.resize(W);
@@ -390,6 +437,63 @@ bool WorkerWW::separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_th
 				SP_Sol[i] = j;
 				i += 1;
 			}
+
+		int LB = 0;
+		for (int i = 0; i < W - 1; ++i)
+			LB += SP.SP_setup[SP_Sol[i]][SP_Sol[i + 1]];
+
+		for (int k = 0; k < W; ++k) {
+			SP_Sol2 = SP_Sol;
+			SP_Sol2.erase(SP_Sol2.begin() + k);
+			int LBs = 0;
+			for (int i = 0; i < W - 2; ++i)
+				LBs += SP.SP_setup[SP_Sol2[i]][SP_Sol2[i + 1]];
+
+			if (LBs < LB)
+				LB = LBs;
+		}
+
+		int set_mins = 0;
+		int set_min = 0;
+		vector<int> set_min_p;
+		set_min_p.resize(PP.P);
+
+		for (int p = 0; p < PP.P; ++p) {
+			int set_mins = 999999;
+			int set_min = 999999;
+			for (int r = 0; r < PP.P; ++r) {
+				if (p != r)
+					set_mins = PP.Products[p].s_pr[r];
+
+				if (set_mins < set_min)
+					set_min = set_mins;
+			}
+			set_min_p[p] = set_min;
+		}
+
+		vector<int> set_min_total;
+		set_min_total.resize(W);
+
+		for (int k = 0; k < W; ++k) {
+			int kk = 0;
+			for (int t = 0; t < PP.T; ++t) {
+				int set_min_max = 0;
+				for (int p = 0; p < PP.P; ++p) {
+					if (x_val[p][t] >= 0.5) {
+						if (kk != k) {
+							set_min_total[k] += set_min_p[p];
+
+							if (set_min_p[p] > set_min_max)
+								set_min_max = set_min_p[p];
+						}
+						kk += 1;
+					}
+				}
+				set_min_total[k] -= set_min_max;
+			}
+		}
+
+		LB = *min_element(set_min_total.begin(), set_min_total.end());
 
 		//DP implementation
 		setupDP sDP;
@@ -460,6 +564,9 @@ bool WorkerWW::separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_th
 			for (int p = 0; p < PP.P; ++p)
 				if (LBsetupPer[p][t] < LBsetupPermin[t])
 					LBsetupPermin[t] = LBsetupPer[p][t];
+
+		if (LB < LB_theta)
+			LB = LB_theta;
 		
 		for (int j = 1; j < W + 1; ++j)
 			Sum1 += pTwoPhaseC->x[wp[j]][wt[j]];
@@ -467,14 +574,14 @@ bool WorkerWW::separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_th
 		for (int k = 1; k < (PP.P * PP.T - W + 1); ++k)
 			Sum2 += pTwoPhaseC->x[wop[k]][wot[k]];
 
-		cutLhs -= (OptimalCost - LB_theta) * (Sum1)-(OptimalCost - LB_theta) * (W - 1) + LB_theta - pTwoPhaseC->theta;
+		cutLhs -= (OptimalCost - LB) * (Sum1)-(OptimalCost - LB) * (W - 1) + LB - pTwoPhaseC->theta;
 		
-		for (int t = 0; t < PP.T; ++t) {
-			for (int p = 0; p < PP.P; ++p) {
+		for (int t = 0; t < pTwoPhaseC->PP.T; ++t) {
+			for (int p = 0; p < pTwoPhaseC->PP.P; ++p) {
 				if (x_val[p][t] >= 0.5)
-					LBsetup[t];//DPCut += (LBsetup[t] - LBsetupPermin[t]) * (1 - pTwoPhaseC->x[p][t]);
+					DPCut[t] += (LBsetup[t] * (1 - pTwoPhaseC->x[p][t]));
 			}
-			//cutDPs -= (pTwoPhaseC->theta_t[t] >= LBsetup[t] - DPCut);
+			cutDPs[t] -= LBsetup[t] - DPCut[t] - pTwoPhaseC->theta_t[t];
 		}
 
 		double LBsetuptotal = 0;
@@ -492,8 +599,7 @@ bool WorkerWW::separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_th
 			}
 		}
 
-		//cutGMs -= (pTwoPhaseC->gamma >= LBresidual - GMCut);
-
+		cutGMs -= LBresidual - GMCut - pTwoPhaseC->gamma;
 		return true;
 	}
 	SP.SPmodel.end();

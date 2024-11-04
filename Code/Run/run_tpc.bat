@@ -18,6 +18,8 @@ P,^
 T,^
 TwoPhase_Callback_Cut,^
 TwoPhase_CPU,^
+TwoPhase_LB,^
+TwoPhase_UB,^
 TwoPhase_Obj,^
 TwoPhase_Callback_CPU,^
 TwoPhase_Callback_Call,^

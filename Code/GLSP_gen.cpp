@@ -23,7 +23,7 @@ void GLSP::SetupModel_S(double timeLimit)
 	q = CreateNumVarArray2(env, P, S, "q", 0, IloInfinity);
 
 	y = CreateBoolVarArray2(env, P, S, "y");
-	z = CreateNumVarArray3(env, P, P, S, "z", 0, IloInfinity);
+	z = CreateBoolVarArray3(env, P, P, S, "z");
 
 	// Constraint (2)
 	for (int p = 0; p < P; ++p)
@@ -139,7 +139,7 @@ void GLSP::SetupModel_NF(double timeLimit)
 	q = CreateNumVarArray2(env, P, S, "q", 0, IloInfinity);
 
 	y = CreateBoolVarArray2(env, P, S, "y");
-	z = CreateNumVarArray3(env, P, P, S, "z", 0, IloInfinity);
+	z = CreateBoolVarArray3(env, P, P, S, "z");
 
 	// Constraint (2)
 	for (int p = 0; p < P; ++p)
@@ -287,6 +287,16 @@ double GLSP::GetLB()
 double GLSP::GetGap()
 {
 	return Solved ? cplex.getMIPRelativeGap() : DBL_MAX;
+}
+
+int GLSP::GetConsts()
+{
+	return Solved ? cplex.getNrows() : 0;
+}
+
+int GLSP::GetVars()
+{
+	return Solved ? cplex.getNcols() : 0;
 }
 
 void GLSP::GetSolutions(int P, int T, int S)

@@ -21,6 +21,8 @@ GLSP_LB,^
 GLSP_UB,^
 GLSP_Obj,^
 GLSP_Gap,^
+Nconsts,^
+Nvars,^
  > %RESULTDIR%\%SUMMARYFILE%
 
 FOR %%f IN (%DATADIR%\*.dat) DO (

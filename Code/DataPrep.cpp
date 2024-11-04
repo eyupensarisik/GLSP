@@ -92,9 +92,10 @@ void ProductPeriods::ReadData(ifstream& file)
 		file >> Products[p].a;
 	file >> DummyToken;
 
-	file.getline(DummyLine, MAX_LINE_LENGTH); file.getline(DummyLine, MAX_LINE_LENGTH);
+	getline(file, DummyToken, ';');
 
-	file >> DummyToken >> DummyToken >> DummyToken >> digit >> digit;
+	file >> DummyToken >> DummyToken >> digit >> digit;
+
 	for (int t = 0; t < T; ++t)
 		file >> K[t];
 	file >> DummyToken >> DummyToken;
@@ -107,7 +108,7 @@ void ProductPeriods::ReadData(ifstream& file)
 	}
 	file >> DummyToken;
 
-	file.getline(DummyLine, MAX_LINE_LENGTH); file.getline(DummyLine, MAX_LINE_LENGTH);
+	getline(file, DummyToken, ';');
 
 	file >> DummyToken >> DummyToken;
 	for (int p = 0; p < P; ++p) {
