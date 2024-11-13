@@ -1,6 +1,3 @@
-call ..\Run\run.bat SingleMachineCapVar25 GLSP_NF 20 5
-call ..\Run\run.bat SingleMachineCapVar25 GLSP_NF 20 10
-call ..\Run\run.bat SingleMachineCapVar25 GLSP_NF 20 15
-call ..\Run\run.bat SingleMachineCapVar25 GLSP_NF 25 5
-call ..\Run\run.bat SingleMachineCapVar25 GLSP_NF 25 10
-call ..\Run\run.bat SingleMachineCapVar25 GLSP_NF 25 15
+call ..\Run\run_tp.bat SingleMachineCapVar2 TwoPhase 3 3
+call ..\Run\run_tp.bat SingleMachineCapVar2 TwoPhase 4 4
+call ..\Run\run_tp.bat SingleMachineCapVar2 TwoPhase 5 5

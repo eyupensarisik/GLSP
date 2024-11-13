@@ -43,7 +43,7 @@ struct ProductPeriods
 	IntegerVector K;	//Total capacity in macro-period t
 	
 	void SetDimensions(int p, int t);
-	void ReadData(ifstream& file);
+	void ReadData(ifstream& file, int& SetupCostLevel);
 	void Resize(int NewP, int NewT);
 	
 };

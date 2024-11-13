@@ -17,7 +17,6 @@ void GLSP::SetupModel_S(double timeLimit)
 	int P = PP.P;
 	int T = PP.T;
 	int S = PP.S;
-	int M = PP.M;
 
 	I = CreateNumVarArray2(env, P, T, "I", 0, IloInfinity);
 	q = CreateNumVarArray2(env, P, S, "q", 0, IloInfinity);
@@ -133,7 +132,6 @@ void GLSP::SetupModel_NF(double timeLimit)
 	int P = PP.P;
 	int T = PP.T;
 	int S = PP.S;
-	int M = PP.M;
 
 	I = CreateNumVarArray2(env, P, T, "I", 0, IloInfinity);
 	q = CreateNumVarArray2(env, P, S, "q", 0, IloInfinity);

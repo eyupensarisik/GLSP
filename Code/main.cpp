@@ -12,7 +12,7 @@ using namespace std::chrono;
 
 int main(int nParams, char* params[])
 {
-	string inputFileName = (nParams > 1 ? params[1] : "../../Data/SingleMachineCapVar25/Data1-25-15-0.6-0.5-100-100-100-0.dat");
+	string inputFileName = (nParams > 1 ? params[1] : "../../Data/SingleMachineCapVar2/Data1-15-15-0.6-0.5-100-100-100-2.dat");
 	string inputFileNameOnly;
 
 	auto fileNameBegin = inputFileName.find_last_of("/\\");
@@ -30,10 +30,10 @@ int main(int nParams, char* params[])
 	string outputFileName = (nParams > 2 ? params[2] : inputFileNameOnly + "_result.csv");
 	string summaryFileName = (nParams > 3 ? params[3] : "summary.csv");
 
-	string parameterFileName = (nParams > 4 ? params[4] : "../Run/Parameters/GLSP_NF.txt");
+	string parameterFileName = (nParams > 4 ? params[4] : "../Run/Parameters/TwoPhase_Callback.txt");
 
-	int pOverride =  stoi((nParams > 5 ? params[5] : "0"));
-	int tOverride =  stoi((nParams > 6 ? params[6] : "0"));
+	int pOverride = stoi((nParams > 5 ? params[5] : "0"));
+	int tOverride = stoi((nParams > 6 ? params[6] : "0"));
 
 	ParameterMap Parameters;
 	ReadParameterMapFromFile(Parameters, parameterFileName);
@@ -61,16 +61,17 @@ int main(int nParams, char* params[])
 		}
 		else if (GetParameterValue(Parameters, "TWO_PHASE_CALLBACK"))
 		{
-			summaryFile << "Name,P,T,TwoPhase_Cut,TwoPhase_CPU,TwoPhase_UB,TwoPhase_LB,TwoPhase_Obj,TwoPhase_Callback_CPU,TwoPhase_Callback_Cut" << endl;
+			summaryFile << "Name,P,T,TwoPhase_Cut,TwoPhase_CPU,TwoPhase_UB,TwoPhase_LB,TwoPhase_Obj,TwoPhase_Callback_CPU,TwoPhase_Callback_Cut,SP_Cons_CPU,SP_Solve_CPU" << endl;
 		}
 	}
 
 	ProductPeriods PP;
 	ifstream file(inputFileName);
+	int SetupCostLevel = GetParameterValue(Parameters, "SETUP_COST_LEVEL");
 	if (file)
 	{
 		cout << endl << endl << "Reading " << inputFileName << endl;
-		PP.ReadData(file);
+		PP.ReadData(file, SetupCostLevel);
 		if (pOverride > 0 && tOverride > 0)
 			PP.Resize(pOverride, tOverride);
 
@@ -204,10 +205,13 @@ int main(int nParams, char* params[])
 			double TwoPhase_UB = 0;
 			double TwoPhase_Obj = 0;
 			double TwoPhase_Cut = 0;
+			double SP_Cons_CPU = 0;
+			double SP_Solve_CPU = 0;
 
 			cout << "Started solving TwoPhase_Callback" << endl;
 			tpC.SetupModel();
 			tpC.Solve(timeLimit);
+			
 			cout << "Finished solving TwoPhase_Callback. UB: " << tpC.GetUB() << " LB: " << tpC.GetLB() << endl;
 
 			TwoPhase_CPU = tpC.GetCPUTime();
@@ -217,6 +221,8 @@ int main(int nParams, char* params[])
 			TwoPhase_Callback_CPU += tpC.GetCallbackCPU();
 			TwoPhase_Callback_Call += tpC.GetCallCount();
 			TwoPhase_Cut += tpC.GetCutCount();
+			SP_Cons_CPU = tpC.GetSPconsCPU();
+			SP_Solve_CPU = tpC.GetSPsolveCPU();
 
 			if (summaryFile)
 			{
@@ -229,7 +235,9 @@ int main(int nParams, char* params[])
 					<< TwoPhase_UB << ","
 					<< TwoPhase_Obj << ","
 					<< TwoPhase_Callback_CPU << ","
-					<< TwoPhase_Callback_Call << endl;
+					<< TwoPhase_Callback_Call << ","
+					<< SP_Cons_CPU << ","
+					<< SP_Solve_CPU << endl;
 			}
 
 		}

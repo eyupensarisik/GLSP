@@ -30,6 +30,12 @@ void Subproblems::SetupBSPModel(int W, vector<int> wp, vector<int> wt, vector<in
 		dd[t] = d_sum;
 	}
 
+	int TotalCapacity = 0;
+	for (int t = 0; t < PP.T; ++t)
+		TotalCapacity += PP.K[t];
+
+	int M = TotalCapacity;
+
 	//Construct Subproblem
 
 	vector<int> SP_a;
@@ -104,7 +110,7 @@ void Subproblems::SetupBSPModel(int W, vector<int> wp, vector<int> wt, vector<in
 	// Constraint (4)
 	for (int j = 0; j < W + 1; ++j)
 		for (int l = 1; l < W + 1; ++l) {
-			SPmodel.add(C[j] + SP_a[l] <= C[l] + PP.M * (1 - e[j][l]));
+			SPmodel.add(C[j] + SP_a[l] <= C[l] + M * (1 - e[j][l]));
 		}
 
 	// Constraint (5)
@@ -123,8 +129,8 @@ void Subproblems::SetupBSPModel(int W, vector<int> wp, vector<int> wt, vector<in
 
 bool Subproblems::BSP_Solve()
 {
-	SPcplex.setParam(IloCplex::ClockType, 2);
-	auto startTime = chrono::high_resolution_clock::now();
+	if (GetParameterValue(Parameters, "THREAD_COUNT"))
+		SPcplex.setParam(IloCplex::Threads, GetParameterValue(Parameters, "THREAD_COUNT"));
 
 	try
 	{
@@ -135,8 +141,6 @@ bool Subproblems::BSP_Solve()
 	{
 		cout << ex.getMessage() << endl;
 	}
-
-	CPU = chrono::duration_cast<chrono::milliseconds>(chrono::high_resolution_clock::now() - startTime).count() / 1000.0;
 
 	return Solved;
 }

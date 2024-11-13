@@ -30,6 +30,10 @@ void TwoPhase::SetupModel()
 		for (int r = 0; r < PP.P; ++r)
 			setup_pr[p][r] = PP.Products[p].s_pr[r];
 
+	int C = 0;
+	for (int t = 0; t < PP.T; ++t)
+		C += PP.K[t];
+
 	theta = IloNumVar(env, 0, IloInfinity, "theta");
 	gamma = IloNumVar(env, 0, IloInfinity, "gamma");
 	theta_t = CreateNumVarArray(env, PP.T, "theta_t", 0, IloInfinity);
@@ -155,6 +159,24 @@ void TwoPhase::SetupModel()
 
 	model.add(theta >= thetaCut + gamma);
 
+	for (int t = 1; t < PP.T; ++t)
+		for (int p = 0; p < PP.P; ++p)
+			model.add(I[p][t - 1] >= PP.Products[p].d[t] * (1 - x[p][t]));
+
+	for (int p = 0; p < PP.P; ++p){
+		for (int t = 1; t < PP.T; ++t){
+			for (int k = t; k < PP.T; ++k) {
+				IloExpr CapVal(env);
+				int d_pkt = 0;
+				for (int j = t; j < k + 1; ++j){
+					CapVal += x[p][j];
+					d_pkt += PP.Products[p].a * PP.Products[p].d[j];
+				}
+				model.add(I[p][t - 1] + C * CapVal >= d_pkt);
+			}
+		}
+	}
+
 	cplex = IloCplex(model);
 
 }
@@ -177,9 +199,20 @@ bool TwoPhase::Solve(double timeLimit, double* TwoPhase_Iter, double* TwoPhase_C
 		double opt_cut = 0;
 		double UB = 0;
 		double UB_best = INT_MAX;
-		double SPtime = 0;
 		double TotalSPtime = 0;
 		double TotalSPcons_time = 0;
+
+		Matrix setup_pr;
+		setup_pr.resize(PP.P);
+		for (int p = 0; p < PP.P; ++p)
+			setup_pr[p].resize(PP.P);
+
+		for (int p = 0; p < PP.P; ++p)
+			for (int r = 0; r < PP.P; ++r)
+				setup_pr[p][r] = PP.Products[p].s_pr[r];
+
+		setupDP sDP;
+		map <pair<int, set<int>>, int> Cache;
 
 		while (true)
 		{
@@ -255,7 +288,6 @@ bool TwoPhase::Solve(double timeLimit, double* TwoPhase_Iter, double* TwoPhase_C
 				Subproblems SP(PP, Parameters);
 
 				SP.SetupBSPModel(W, wp, wt, wop, wot);
-				
 
 				auto finishSP_cons = chrono::high_resolution_clock::now();
 				auto SPcons_time = chrono::duration_cast<chrono::milliseconds>(finishSP_cons - startSP_cons);
@@ -402,8 +434,7 @@ bool TwoPhase::Solve(double timeLimit, double* TwoPhase_Iter, double* TwoPhase_C
 					LB = *min_element(set_min_total.begin(), set_min_total.end());
 
 					//DP implementation
-					setupDP sDP;
-					map <pair<int, set<int>>, int> Cache;
+					
 					vector<double> LBsetup;
 					LBsetup.resize(PP.T);
 
@@ -414,22 +445,16 @@ bool TwoPhase::Solve(double timeLimit, double* TwoPhase_Iter, double* TwoPhase_C
 
 					int LBsetupDP = 0;
 
-					int per = 0;
-					int pre_per = 0;
-
 					for (int t = 0; t < PP.T; ++t) {
+						set<int> current;
 						for (int p = 0; p < PP.P; ++p) {
 							if (x_val[p][t] >= 0.5)
-								per += 1;
+								current.insert(p);
 						}
-
-						set<int> current;
-						for (int i = pre_per; i < per; ++i)
-							current.insert(SP_Sol[i]);
 
 						if (!current.empty()) {
 							cout << "Finding minimum setup" << endl;
-							LBsetupDP = sDP.MinSetup(Cache, SP.SP_setup, -1, current);
+							LBsetupDP = sDP.MinSetup(Cache, setup_pr, -1, current);
 							cout << "Done. Minimum setup: " << LBsetupDP << endl;
 						}
 						else
@@ -438,27 +463,28 @@ bool TwoPhase::Solve(double timeLimit, double* TwoPhase_Iter, double* TwoPhase_C
 						LBsetup[t] = LBsetupDP;
 
 						auto currentCopy = current;
-					if (pre_per != per){
-						for (int i = pre_per; i < per; ++i) {
-							current.erase(SP_Sol[i]);
 
-							if (!current.empty()) {
-								cout << "Finding minimum setup" << endl;
-								LBsetupDP = sDP.MinSetup(Cache, SP.SP_setup, -1, current);
-								cout << "Done. Minimum setup: " << LBsetupDP << endl;
+						if (!current.empty()) {
+							for (int p = 0; p < PP.P; ++p) {
+								if (x_val[p][t] >= 0.5)
+									current.erase(p);
+
+								if (!current.empty()) {
+									cout << "Finding minimum setup" << endl;
+									LBsetupDP = sDP.MinSetup(Cache, setup_pr, -1, current);
+									cout << "Done. Minimum setup: " << LBsetupDP << endl;
+								}
+								else
+									LBsetupDP = 0;
+
+								current = currentCopy;
+
+								LBsetupPer[p][t] = LBsetupDP;
 							}
-							else
-								LBsetupDP = 0;
-
-							current = currentCopy;
-
-							LBsetupPer[wp[SP_Sol[i]]][t] = LBsetupDP;
 						}
-					}
-					else
-						for (int p = 0; p < PP.P; ++p)
-							LBsetupPer[p][t] = 0;
-						pre_per = per;
+						else
+							for (int p = 0; p < PP.P; ++p)
+								LBsetupPer[p][t] = 0;
 					}
 
 					vector<int> LBsetupPermin;
@@ -516,9 +542,8 @@ bool TwoPhase::Solve(double timeLimit, double* TwoPhase_Iter, double* TwoPhase_C
 					model.add(gamma >= LBresidual - GMCut);
 
 					model.add(theta >= (nu_hat - LB) * Sum1 - (nu_hat - LB) * (W - 1) + LB);
-
 				}
-				SP.SPmodel.end();
+				//SP.SPmodel.end();
 			}
 			else {
 				Solved = 1;

@@ -23,6 +23,8 @@ TwoPhase_UB,^
 TwoPhase_Obj,^
 TwoPhase_Callback_CPU,^
 TwoPhase_Callback_Call,^
+SP_Cons_CPU,^
+SP_Solve_CPU,^
  > %RESULTDIR%\%SUMMARYFILE%
 
 FOR %%f IN (%DATADIR%\*.dat) DO (

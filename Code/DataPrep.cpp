@@ -66,7 +66,7 @@ void ProductPeriods::Resize(int NewP, int NewT)
 	}
 }
 
-void ProductPeriods::ReadData(ifstream& file)
+void ProductPeriods::ReadData(ifstream& file, int& SetupCostLevel)
 {
 	const int MAX_LINE_LENGTH = 1000;
 	char DummyLine[MAX_LINE_LENGTH];
@@ -77,7 +77,7 @@ void ProductPeriods::ReadData(ifstream& file)
 	file >> DummyToken >> DummyToken >> P >> DummyToken;
 	file >> DummyToken >> DummyToken >> T >> DummyToken;
 	S = P * T;
-	M = 9999;
+
 	file >> DummyToken >> DummyToken >> DummyToken;
 
 	SetDimensions(P, T);
@@ -117,7 +117,7 @@ void ProductPeriods::ReadData(ifstream& file)
 			file >> Products[p].s_pr[r];
 	}
 	file >> DummyToken;
-
+	
 	file >> DummyToken >> DummyToken >> DummyToken >> digit >> digit;
 	for (int p = 0; p < P; ++p)
 		file >> Products[p].m;
@@ -133,6 +133,14 @@ void ProductPeriods::ReadData(ifstream& file)
 		S_f[t] = P * (t + 1);
 		L[t] = (P * (t + 1)) - 1;
 	}
+
+	if (SetupCostLevel > 1){
+		for (int p = 0; p < P; ++p) {
+			for (int r = 0; r < P; ++r)
+				Products[p].s_pr[r] = ceil(Products[p].s_pr[r] / SetupCostLevel);
+		}
+	}
+
 	/*
 	cout << "Value of DummyToken is " << DummyToken << endl;
 	cout << "Value of digit is " << digit << endl;

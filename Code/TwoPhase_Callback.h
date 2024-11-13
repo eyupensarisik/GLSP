@@ -4,9 +4,12 @@
 
 #include "Common.h"
 #include "DataPrep.h"
+#include "setupDP.h"
 #include <unordered_map>
 #include <list>
 #include <mutex>
+
+typedef vector<vector<double>> Matrix;
 
 struct TwoPhaseC;
 
@@ -16,17 +19,23 @@ struct Worker
 	size_t CallCount;
 	size_t CutCount;
 	double CPU;
+	double TotalSPtime;
+	double TotalSPcons_time;
 
 	Worker(TwoPhaseC* pTwoPhaseC);
 
-	virtual bool separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_theta, const IloNum thetaVal, const NumArray2& xSol, double& OptimalCost, IloExpr& cutLhs, IloExpr& cutGMs, IloExpr& Sum1, IloExpr& Sum2, IloExpr& GMCut, IloExprArray& DPCut, IloExprArray& cutDPs) = 0;
+	virtual bool separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_theta, const IloNum thetaVal, const NumArray2& xSol, double& OptimalCost,
+		IloExpr& cutLhs, IloExpr& cutGMs, IloExpr& Sum1, IloExpr& Sum2, IloExpr& GMCut, IloExprArray& DPCut, IloExprArray& cutDPs, 
+		Matrix setup_pr) = 0;
 };
 
 struct WorkerWW : public Worker
 {
 	WorkerWW(TwoPhaseC* pTwoPhaseC);
 
-	bool separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_theta, const IloNum thetaVal, const NumArray2& xSol, double& OptimalCost, IloExpr& cutLhs, IloExpr& cutGMs, IloExpr& Sum1, IloExpr& Sum2, IloExpr& GMCut, IloExprArray& DPCut, IloExprArray& cutDPs);
+	bool separate(ProductPeriods& PP, ParameterMap& Parameters,  int& LB_theta, const IloNum thetaVal, const NumArray2& xSol, double& OptimalCost,
+		IloExpr& cutLhs, IloExpr& cutGMs, IloExpr& Sum1, IloExpr& Sum2, IloExpr& GMCut, IloExprArray& DPCut, IloExprArray& cutDPs, 
+		Matrix setup_pr);
 };
 
 struct TwoPhaseCallback : public IloCplex::Callback::Function
@@ -72,9 +81,12 @@ struct TwoPhaseC
 
 	int IntegerSolutionLimit = INT_MAX;
 	int LB_theta;
+	double W_SPtime = 0;
+	double W_SPcons_time = 0;
 
-	bool ReuseCuts = false;
-	list <pair<IntegerVector, IloConstraintArray>> CutPool;
+	setupDP sDP;
+	map <pair<int, set<int>>, int> Cache;
+	Matrix setup_pr;
 
 	list<IloConstraint> GeneratedCuts;
 
@@ -90,5 +102,7 @@ struct TwoPhaseC
 	double GetCallbackCPU();
 	size_t GetCallCount();
 	size_t GetCutCount();
+	double GetSPconsCPU();
+	double GetSPsolveCPU();
 };
 #endif

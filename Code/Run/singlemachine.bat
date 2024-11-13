@@ -1,9 +1,2 @@
-call ..\Run\run.bat SingleMachineCapVar2 GLSP_Standard 5 5
-call ..\Run\run.bat SingleMachineCapVar2 GLSP_Standard 5 10
-call ..\Run\run.bat SingleMachineCapVar2 GLSP_Standard 5 15
-call ..\Run\run.bat SingleMachineCapVar2 GLSP_Standard 10 5
-call ..\Run\run.bat SingleMachineCapVar2 GLSP_Standard 10 10
-call ..\Run\run.bat SingleMachineCapVar2 GLSP_Standard 10 15
-call ..\Run\run.bat SingleMachineCapVar2 GLSP_Standard 15 5
-call ..\Run\run.bat SingleMachineCapVar2 GLSP_Standard 15 10
-call ..\Run\run.bat SingleMachineCapVar2 GLSP_Standard 0 0
+call ..\Run\run.bat SingleMachineCapVar2 GLSP_NF 10 5
+call ..\Run\run.bat SingleMachineCapVar2 GLSP_NF 15 5

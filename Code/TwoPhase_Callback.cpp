@@ -21,8 +21,6 @@ TwoPhaseC::~TwoPhaseC()
 void TwoPhaseC::SetupModel()
 {
 	// Setup Master Problem
-
-	Matrix setup_pr;
 	setup_pr.resize(PP.P);
 	for (int p = 0; p < PP.P; ++p)
 		setup_pr[p].resize(PP.P);
@@ -60,9 +58,7 @@ void TwoPhaseC::SetupModel()
 		}
 	model.add(theta);
 	model.add(gamma);
-
-	for (int t = 0; t < PP.T; ++t)
-		model.add(theta_t[t]);
+	model.add(theta_t);
 
 	IloExpr MPobj1(env);
 	for (int p = 0; p < PP.P; ++p)
@@ -105,37 +101,18 @@ void TwoPhaseC::SetupModel()
 		for (int p = 0; p < PP.P; ++p)
 			model.add(q[p][t] * PP.Products[p].a <= PP.K[t] * x[p][t]);
 
-	Subproblems SP(PP, Parameters);
-
-	int W_In = PP.P;
-
-	vector<int> wp_In;
-	wp_In.resize(W_In + 2);
-	vector<int> wt_In;
-	wt_In.resize(W_In + 2);
-	vector<int> wop_In;
-	wop_In.resize(PP.P - W_In + 2);
-	vector<int> wot_In;
-	wot_In.resize(PP.P - W_In + 2);
-	int j = 0;
+	set<int> current_In;
 	for (int p = 0; p < PP.P; ++p)
-		for (int t = 0; t < 1; ++t) {
-			j += 1;
-			wp_In[j] = p;
-			wt_In[j] = t;
-		}
+		current_In.insert(p);
 
-	SP.SetupBSPModel(W_In, wp_In, wt_In, wop_In, wot_In);
-	SP.BSP_Solve();
+	if (!current_In.empty())
+		LB_theta = sDP.MinSetup(Cache, setup_pr, -1, current_In);
 
-	LB_theta = SP.GetBSP_UB();
 	model.add(theta >= LB_theta);
-
+	
 	double ValIn_setup = 0;
 	IloExpr ValIn(env);
 
-	setupDP sDP;
-	map <pair<int, set<int>>, int> Cache;
 	set<int> current;
 	for (int t = 0; t < PP.T; ++t) {
 		for (int p = 0; p < PP.P; ++p)
@@ -159,8 +136,11 @@ void TwoPhaseC::SetupModel()
 
 	model.add(theta >= thetaCut + gamma);
 
-	cplex = IloCplex(model);
+	for (int t = 1; t < PP.T; ++t)
+		for (int p = 0; p < PP.P; ++p)
+			model.add(I[p][t - 1] >= PP.Products[p].d[t] * (1 - x[p][t]));
 
+	cplex = IloCplex(model);
 }
 
 bool TwoPhaseC::Solve(double timeLimit)
@@ -181,6 +161,7 @@ bool TwoPhaseC::Solve(double timeLimit)
 		cplex.use(pCallback.get(), contextmask);
 
 		cplex.setParam(IloCplex::IntSolLim, IntegerSolutionLimit);
+		cout << "Started solving Master problem" << endl;
 		Solved = cplex.solve();
 	}
 	catch (IloException& ex)
@@ -189,7 +170,7 @@ bool TwoPhaseC::Solve(double timeLimit)
 	}
 
 	CPU = chrono::duration_cast<chrono::milliseconds>(chrono::high_resolution_clock::now() - startTime).count() / 1000.0;
-
+	
 	return Solved;
 }
 
@@ -211,6 +192,28 @@ double TwoPhaseC::GetCallbackCPU()
 	double Total = 0;
 	for (auto& Worker : pCallback->workers)
 		Total += Worker->CPU;
+	return Total;
+}
+
+double TwoPhaseC::GetSPsolveCPU()
+{
+	if (!Solved)
+		return 0;
+
+	double Total = 0;
+	for (auto& Worker : pCallback->workers)
+		Total += (float)Worker->TotalSPtime / 1000;
+	return Total;
+}
+
+double TwoPhaseC::GetSPconsCPU()
+{
+	if (!Solved)
+		return 0;
+
+	double Total = 0;
+	for (auto& Worker : pCallback->workers)
+		Total += (float)Worker->TotalSPcons_time / 1000;
 	return Total;
 }
 
@@ -288,6 +291,15 @@ void TwoPhaseCallback::invoke(const IloCplex::Callback::Context& context)
 		throw IloCplex::Exception(-1, "Unexpected contextID");
 	}
 
+	Matrix setup_pr;
+	setup_pr.resize(pTwoPhaseC->PP.P);
+	for (int p = 0; p < pTwoPhaseC->PP.P; ++p)
+		setup_pr[p].resize(pTwoPhaseC->PP.P);
+
+	for (int p = 0; p < pTwoPhaseC->PP.P; ++p)
+		for (int r = 0; r < pTwoPhaseC->PP.P; ++r)
+			setup_pr[p][r] = pTwoPhaseC->PP.Products[p].s_pr[r];
+
 	IloExpr cutLhs(env);
 	IloExpr cutGMs(env);
 	IloExprArray cutDPs(env, pTwoPhaseC->PP.T);
@@ -304,13 +316,13 @@ void TwoPhaseCallback::invoke(const IloCplex::Callback::Context& context)
 	double OptimalCost;
 
 
-	IloBool sepStat = worker->separate(pTwoPhaseC->PP, pTwoPhaseC->Parameters, pTwoPhaseC->LB_theta, thetaVal, xVal, OptimalCost, cutLhs, cutGMs, Sum1, Sum2, GMCut, DPCut, cutDPs);
+	IloBool sepStat = worker->separate(pTwoPhaseC->PP, pTwoPhaseC->Parameters, pTwoPhaseC->LB_theta, thetaVal, xVal, OptimalCost, cutLhs, cutGMs, Sum1, Sum2, GMCut, DPCut, cutDPs, setup_pr);
 
 	if (context.getId() == IloCplex::Callback::Context::Id::Candidate)
 	{
 		IloNum CandidateObjective = context.getCandidateObjective();
 		IloNum IncumbentObjective = context.getIncumbentObjective();
-		IloNum ActualCandidateObjective = CandidateObjective + thetaVal - OptimalCost;
+		IloNum ActualCandidateObjective = CandidateObjective - thetaVal + OptimalCost;
 	}
 
 	xVal.end();
@@ -347,6 +359,8 @@ void TwoPhaseCallback::invoke(const IloCplex::Callback::Context& context)
 	if (sepStat)
 		++worker->CutCount;
 	worker->CPU += chrono::duration_cast<chrono::milliseconds>(chrono::high_resolution_clock::now() - startTime).count() / 1000.0;
+	worker->TotalSPtime += pTwoPhaseC->W_SPtime;
+	worker->TotalSPcons_time += pTwoPhaseC->W_SPcons_time;
 }
 
 Worker::Worker(TwoPhaseC* pB) : pTwoPhaseC(pB)
@@ -354,17 +368,19 @@ Worker::Worker(TwoPhaseC* pB) : pTwoPhaseC(pB)
 	CallCount = 0;
 	CutCount = 0;
 	CPU = 0;
+	TotalSPtime = 0;
+	TotalSPcons_time = 0;
 }
 
 WorkerWW::WorkerWW(TwoPhaseC* pB) : Worker(pB)
 {
 }
 
-bool WorkerWW::separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_theta, const IloNum thetaVal, const NumArray2& xVal, double& OptimalCost, IloExpr& cutLhs, IloExpr& cutGMs, IloExpr& Sum1, IloExpr& Sum2, IloExpr& GMCut, IloExprArray& DPCut, IloExprArray& cutDPs)
+bool WorkerWW::separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_theta, const IloNum thetaVal, const NumArray2& xVal, double& OptimalCost, IloExpr& cutLhs, IloExpr& cutGMs, IloExpr& Sum1, IloExpr& Sum2, IloExpr& GMCut, IloExprArray& DPCut, IloExprArray& cutDPs, Matrix setup_pr)
 {
 	int W = 0;
-	for (int p = 0; p < pTwoPhaseC->PP.P; ++p)
-		for (int t = 0; t < pTwoPhaseC->PP.T; ++t) {
+	for (int p = 0; p < PP.P; ++p)
+		for (int t = 0; t < PP.T; ++t) {
 			if (xVal[p][t] > 0.999)
 				W += 1;
 		}
@@ -383,19 +399,19 @@ bool WorkerWW::separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_th
 				x_val[p][t] = 0;
 		}
 	}
-
+	auto startSP_cons = chrono::high_resolution_clock::now(); //Start clock for SP
 	vector<int> wp;
 	wp.resize(W + 2);
 	vector<int> wt;
 	wt.resize(W + 2);
 	vector<int> wop;
-	wop.resize(pTwoPhaseC->PP.P * pTwoPhaseC->PP.T - W + 2);
+	wop.resize(PP.P * PP.T - W + 2);
 	vector<int> wot;
-	wot.resize(pTwoPhaseC->PP.P * pTwoPhaseC->PP.T - W + 2);
+	wot.resize(PP.P * PP.T - W + 2);
 	int j = 0;
 	int k = 0;
-	for (int p = 0; p < pTwoPhaseC->PP.P; ++p)
-		for (int t = 0; t < pTwoPhaseC->PP.T; ++t)
+	for (int p = 0; p < PP.P; ++p)
+		for (int t = 0; t < PP.T; ++t)
 			if (xVal[p][t] > 0.999) {
 				j += 1;
 				wp[j] = p;
@@ -408,10 +424,20 @@ bool WorkerWW::separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_th
 			}
 
 	Subproblems SP(PP, Parameters);
-
+	
 	SP.SetupBSPModel(W, wp, wt, wop, wot);
+	auto finishSP_cons = chrono::high_resolution_clock::now();
+	auto SPcons_time = chrono::duration_cast<chrono::milliseconds>(finishSP_cons - startSP_cons);
+	pTwoPhaseC->W_SPcons_time = SPcons_time.count();
+
+	cout << "Started solving Subproblem" << endl;
+	auto startSP = chrono::high_resolution_clock::now(); //Start clock for SP
 
 	bool resultSP = SP.BSP_Solve();
+
+	auto finishSP = chrono::high_resolution_clock::now();
+	auto SPtime = chrono::duration_cast<chrono::milliseconds>(finishSP - startSP);
+	pTwoPhaseC->W_SPtime = SPtime.count();
 
 	OptimalCost = SP.GetBSP_UB();
 	SP.GetBSP_Solutions(W);
@@ -421,7 +447,6 @@ bool WorkerWW::separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_th
 	{
 		cutLhs.clear();
 		cutGMs.clear();
-		//cutDPs.clear();
 
 		vector<int> SP_Sol;
 		SP_Sol.resize(W);
@@ -459,8 +484,8 @@ bool WorkerWW::separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_th
 		set_min_p.resize(PP.P);
 
 		for (int p = 0; p < PP.P; ++p) {
-			int set_mins = 999999;
-			int set_min = 999999;
+			int set_mins = INT_MAX;
+			int set_min = INT_MAX;
 			for (int r = 0; r < PP.P; ++r) {
 				if (p != r)
 					set_mins = PP.Products[p].s_pr[r];
@@ -496,8 +521,6 @@ bool WorkerWW::separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_th
 		LB = *min_element(set_min_total.begin(), set_min_total.end());
 
 		//DP implementation
-		setupDP sDP;
-		map <pair<int, set<int>>, int> Cache;
 		vector<double> LBsetup;
 		LBsetup.resize(PP.T);
 
@@ -508,51 +531,40 @@ bool WorkerWW::separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_th
 
 		int LBsetupDP = 0;
 
-		int per = 0;
-		int pre_per = 0;
-
 		for (int t = 0; t < PP.T; ++t) {
+			set<int> current;
 			for (int p = 0; p < PP.P; ++p) {
 				if (x_val[p][t] >= 0.5)
-					per += 1;
+					current.insert(p);
 			}
 
-			set<int> current;
-			for (int i = pre_per; i < per; ++i)
-				current.insert(SP_Sol[i]);
-
-			if (!current.empty()) {
-				//cout << "Finding minimum setup" << endl;
-				LBsetupDP = sDP.MinSetup(Cache, SP.SP_setup, -1, current);
-				//cout << "Done. Minimum setup: " << LBsetupDP << endl;
-			}
+			if (!current.empty()) 
+				LBsetupDP = pTwoPhaseC->sDP.MinSetup(pTwoPhaseC->Cache, setup_pr, -1, current);
 			else
 				LBsetupDP = 0;
 
 			LBsetup[t] = LBsetupDP;
 
 			auto currentCopy = current;
-			if (pre_per != per) {
-				for (int i = pre_per; i < per; ++i) {
-					current.erase(SP_Sol[i]);
 
-					if (!current.empty()) {
-						//cout << "Finding minimum setup" << endl;
-						LBsetupDP = sDP.MinSetup(Cache, SP.SP_setup, -1, current);
-						//cout << "Done. Minimum setup: " << LBsetupDP << endl;
-					}
+			if (!current.empty()) {
+				for (int p = 0; p < PP.P; ++p) {
+					if (x_val[p][t] >= 0.5)
+						current.erase(p);
+
+					if (!current.empty())
+						LBsetupDP = pTwoPhaseC->sDP.MinSetup(pTwoPhaseC->Cache, setup_pr, -1, current);
 					else
 						LBsetupDP = 0;
 
 					current = currentCopy;
 
-					LBsetupPer[wp[SP_Sol[i]]][t] = LBsetupDP;
+					LBsetupPer[p][t] = LBsetupDP;
 				}
 			}
 			else
 				for (int p = 0; p < PP.P; ++p)
 					LBsetupPer[p][t] = 0;
-			pre_per = per;
 		}
 
 		vector<int> LBsetupPermin;
@@ -602,6 +614,6 @@ bool WorkerWW::separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_th
 		cutGMs -= LBresidual - GMCut - pTwoPhaseC->gamma;
 		return true;
 	}
-	SP.SPmodel.end();
+	//SP.SPmodel.end();
 	return false;
 }
