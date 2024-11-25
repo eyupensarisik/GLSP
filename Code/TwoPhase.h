@@ -44,7 +44,7 @@ struct TwoPhase
 
 	void SetupModel();
 	void SetIntegerSolutionLimit(int i) { IntegerSolutionLimit = i; }
-	bool Solve(double timeLimit, double* TwoPhase_Iter, double* TwoPhase_Cut, double* TwoPhase_CPU, double* TwoPhase_UB, double* TwoPhase_LB, double* SP_Cons_CPU, double* SP_Solve_CPU, double* MP_CPU);
+	bool Solve(double timeLimit, double* TwoPhase_Iter, double* TwoPhase_Cut, double* TwoPhase_CPU, double* TwoPhase_UB, double* TwoPhase_LB, double* SP_Cons_CPU, double* SP_Solve_CPU, double* MP_CPU, int SPtype);
 	double GetCPUTime() { return CPU; }
 	double GetLB();
 	double GetUB();

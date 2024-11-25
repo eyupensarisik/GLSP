@@ -29,6 +29,10 @@ void TwoPhaseC::SetupModel()
 		for (int r = 0; r < PP.P; ++r)
 			setup_pr[p][r] = PP.Products[p].s_pr[r];
 
+	int TotalCap = 0;
+	for (int t = 0; t < PP.T; ++t)
+		TotalCap += PP.K[t];
+
 	theta = IloNumVar(env, 0, IloInfinity, "theta");
 	gamma = IloNumVar(env, 0, IloInfinity, "gamma");
 	theta_t = CreateNumVarArray(env, PP.T, "theta_t", 0, IloInfinity);
@@ -139,6 +143,25 @@ void TwoPhaseC::SetupModel()
 	for (int t = 1; t < PP.T; ++t)
 		for (int p = 0; p < PP.P; ++p)
 			model.add(I[p][t - 1] >= PP.Products[p].d[t] * (1 - x[p][t]));
+
+	for (int p = 0; p < PP.P; ++p) {
+		for (int t = 1; t < PP.T; ++t) {
+			double eta;
+			double alpha;
+			for (int k = t; k < PP.T; ++k) {
+				IloExpr CapVal(env);
+				int d_pkt = 0;
+				for (int j = t; j < k + 1; ++j) {
+					CapVal += x[p][j];
+					d_pkt += PP.Products[p].a * PP.Products[p].d[j];
+				}
+				//model.add(I[p][t - 1] + TotalCap * CapVal >= d_pkt);
+				eta = ceil(d_pkt / TotalCap);
+				alpha = d_pkt - TotalCap * (eta - 1);
+				model.add(I[p][t - 1] >= alpha * (eta - CapVal));
+			}
+		}
+	}
 
 	cplex = IloCplex(model);
 }

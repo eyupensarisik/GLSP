@@ -30,9 +30,9 @@ void TwoPhase::SetupModel()
 		for (int r = 0; r < PP.P; ++r)
 			setup_pr[p][r] = PP.Products[p].s_pr[r];
 
-	int C = 0;
+	int TotalCap = 0;
 	for (int t = 0; t < PP.T; ++t)
-		C += PP.K[t];
+		TotalCap += PP.K[t];
 
 	theta = IloNumVar(env, 0, IloInfinity, "theta");
 	gamma = IloNumVar(env, 0, IloInfinity, "gamma");
@@ -165,6 +165,8 @@ void TwoPhase::SetupModel()
 
 	for (int p = 0; p < PP.P; ++p){
 		for (int t = 1; t < PP.T; ++t){
+			double eta;
+			double alpha;
 			for (int k = t; k < PP.T; ++k) {
 				IloExpr CapVal(env);
 				int d_pkt = 0;
@@ -172,7 +174,10 @@ void TwoPhase::SetupModel()
 					CapVal += x[p][j];
 					d_pkt += PP.Products[p].a * PP.Products[p].d[j];
 				}
-				model.add(I[p][t - 1] + C * CapVal >= d_pkt);
+				//model.add(I[p][t - 1] + TotalCap * CapVal >= d_pkt);
+				eta = ceil(d_pkt / TotalCap);
+				alpha = d_pkt - TotalCap * (eta - 1);
+				model.add(I[p][t - 1] >= alpha * (eta - CapVal));
 			}
 		}
 	}
@@ -181,7 +186,7 @@ void TwoPhase::SetupModel()
 
 }
 
-bool TwoPhase::Solve(double timeLimit, double* TwoPhase_Iter, double* TwoPhase_Cut, double* TwoPhase_CPU, double* TwoPhase_UB, double* TwoPhase_LB, double* SP_Cons_CPU, double* SP_Solve_CPU, double* MP_CPU)
+bool TwoPhase::Solve(double timeLimit, double* TwoPhase_Iter, double* TwoPhase_Cut, double* TwoPhase_CPU, double* TwoPhase_UB, double* TwoPhase_LB, double* SP_Cons_CPU, double* SP_Solve_CPU, double* MP_CPU, int SPtype)
 {	
 	cplex.setParam(IloCplex::ClockType, 2);
 	auto startTime = chrono::high_resolution_clock::now();
@@ -259,49 +264,100 @@ bool TwoPhase::Solve(double timeLimit, double* TwoPhase_Iter, double* TwoPhase_C
 							q_hat[j] = cplex.getValue(q[p][t]);
 						}
 
-				//Construct Subproblem
-				auto startSP_cons = chrono::high_resolution_clock::now(); //Start clock for SP
+				
+				double nu_hat = 0;
 
-				vector<int> wp;
-				wp.resize(W + 2);
-				vector<int> wt;
-				wt.resize(W + 2);
-				vector<int> wop;
-				wop.resize(PP.P * PP.T - W + 2);
-				vector<int> wot;
-				wot.resize(PP.P * PP.T - W + 2);
-				j = 0;
-				int k = 0;
-				for (int p = 0; p < PP.P; ++p)
-					for (int t = 0; t < PP.T; ++t)
-						if (x_val[p][t] >= 1 - 0.0001) {
-							j += 1;
-							wp[j] = p;
-							wt[j] = t;
+				if (SPtype == 0){
+					//Construct Subproblem
+					auto startSP_cons = chrono::high_resolution_clock::now(); //Start clock for SP
+
+					vector<int> wp;
+					wp.resize(W + 2);
+					vector<int> wt;
+					wt.resize(W + 2);
+					vector<int> wop;
+					wop.resize(PP.P * PP.T - W + 2);
+					vector<int> wot;
+					wot.resize(PP.P * PP.T - W + 2);
+					j = 0;
+					int k = 0;
+					for (int p = 0; p < PP.P; ++p)
+						for (int t = 0; t < PP.T; ++t)
+							if (x_val[p][t] >= 1 - 0.0001) {
+								j += 1;
+								wp[j] = p;
+								wt[j] = t;
+							}
+							else {
+								k += 1;
+								wop[k] = p;
+								wot[k] = t;
+							}
+
+					Subproblems SP(PP, Parameters);
+
+					SP.SetupBSPModel(W, wp, wt, wop, wot);
+
+					auto finishSP_cons = chrono::high_resolution_clock::now();
+					auto SPcons_time = chrono::duration_cast<chrono::milliseconds>(finishSP_cons - startSP_cons);
+					TotalSPcons_time += SPcons_time.count();
+
+					auto startSP = chrono::high_resolution_clock::now(); //Start clock for SP
+					SP.BSP_Solve();
+
+					auto finishSP = chrono::high_resolution_clock::now();
+					auto SPtime = chrono::duration_cast<chrono::milliseconds>(finishSP - startSP);
+					TotalSPtime += SPtime.count();
+
+					nu_hat = SP.GetBSP_UB();
+					SP.GetBSP_Solutions(W);
+
+					CacheMP MPcache;
+					vector<ProductSet> ProductPPs;
+
+					for (int t = 0; t < PP.T; ++t) {
+						ProductSet MPcurrent;
+						for (int p = 0; p < PP.P; ++p) {
+							if (x_val[p][t] >= 1 - 0.0001) {
+								MPcurrent.insert(p);
+							}
 						}
-						else {
-							k += 1;
-							wop[k] = p;
-							wot[k] = t;
+						ProductPPs.push_back(MPcurrent);
+					}
+					int nu_hatt = 0;
+					nu_hatt = sDP.MinSetupMultiPeriod(MPcache, setup_pr, -1, ProductPPs, -1);
+
+					}
+				else if (SPtype == 1){
+					auto startSP_cons = chrono::high_resolution_clock::now(); //Start clock for SP
+					CacheMP MPcache;
+					vector<ProductSet> ProductPPs;
+
+					for (int t = 0; t < PP.T; ++t){
+						ProductSet MPcurrent;
+						for (int p = 0; p < PP.P; ++p){
+							if (x_val[p][t] >= 1 - 0.0001){
+								MPcurrent.insert(p);
+							}
 						}
+						ProductPPs.push_back(MPcurrent);
+					}
 
-				Subproblems SP(PP, Parameters);
+					auto finishSP_cons = chrono::high_resolution_clock::now();
+					auto SPcons_time = chrono::duration_cast<chrono::milliseconds>(finishSP_cons - startSP_cons);
+					TotalSPcons_time += SPcons_time.count();
 
-				SP.SetupBSPModel(W, wp, wt, wop, wot);
+					auto startSP = chrono::high_resolution_clock::now(); //Start clock for SP
 
-				auto finishSP_cons = chrono::high_resolution_clock::now();
-				auto SPcons_time = chrono::duration_cast<chrono::milliseconds>(finishSP_cons - startSP_cons);
-				TotalSPcons_time += SPcons_time.count();
+					cout << "Finding minimum setup multiperiod" << endl;
+					nu_hat = sDP.MinSetupMultiPeriod(MPcache, setup_pr, -1, ProductPPs, -1);
+					cout << "Done. Minimum setup: " << nu_hat << endl;
+					cout << "Cache size: " << MPcache.size() << endl;
 
-				auto startSP = chrono::high_resolution_clock::now(); //Start clock for SP
-				SP.BSP_Solve();
-
-				auto finishSP = chrono::high_resolution_clock::now();
-				auto SPtime = chrono::duration_cast<chrono::milliseconds>(finishSP - startSP);
-				TotalSPtime += SPtime.count();
-
-				double nu_hat = SP.GetBSP_UB();
-				SP.GetBSP_Solutions(W);
+					auto finishSP = chrono::high_resolution_clock::now();
+					auto SPtime = chrono::duration_cast<chrono::milliseconds>(finishSP - startSP);
+					TotalSPtime += SPtime.count();
+				}
 
 				UB = cplex.getObjValue() - theta_hat + nu_hat;
 				if (UB <= UB_best)
@@ -331,12 +387,6 @@ bool TwoPhase::Solve(double timeLimit, double* TwoPhase_Iter, double* TwoPhase_C
 					cout << "TwoPhase objective " << cplex.getObjValue() << endl;
 					cout << "Value of theta is " << cplex.getValue(theta) << endl;
 
-					for (int j = 1; j < W + 1; ++j)
-						for (int l = 1; l < W + 1; ++l) {
-							if (SP.e_val[j][l] > 0.5)
-								cout << "Value of e[" << j << "][" << l << "] is " << SP.e_val[j][l] << endl;
-						}
-
 					for (int p = 0; p < PP.P; ++p) {
 						for (int t = 0; t < PP.T; ++t) {
 							if (x_val[p][t] >= 0.5)
@@ -359,38 +409,8 @@ bool TwoPhase::Solve(double timeLimit, double* TwoPhase_Iter, double* TwoPhase_C
 				else
 				{
 					opt_cut += 1;
-
-					vector<int> SP_Sol;
-					SP_Sol.resize(W);
-
-					vector<int> SP_Sol2;
-
-					int j = 0;
-					int i = 0;
-					for (int l = 1; l < W + 1; ++l)
-						if (SP.e_val[j][l] > 0.5) {
-							cout << "Value of e[" << j << "][" << l << "] is " << SP.e_val[j][l] << endl;
-							j = l;
-							l = 0;
-							SP_Sol[i] = j;
-							i += 1;
-						}
-
 					int LB = 0;
-					for (int i = 0; i < W - 1; ++i)
-						LB += SP.SP_setup[SP_Sol[i]][SP_Sol[i + 1]];
-
-					for (int k = 0; k < W; ++k) {
-						SP_Sol2 = SP_Sol;
-						SP_Sol2.erase(SP_Sol2.begin() + k);
-						int LBs = 0;
-						for (int i = 0; i < W - 2; ++i)
-							LBs += SP.SP_setup[SP_Sol2[i]][SP_Sol2[i + 1]];
-
-						if (LBs < LB)
-							LB = LBs;
-					}
-
+					
 					int set_mins = 0;
 					int set_min = 0;
 					vector<int> set_min_p;
@@ -499,7 +519,7 @@ bool TwoPhase::Solve(double timeLimit, double* TwoPhase_Iter, double* TwoPhase_C
 
 					if (LB < LB_theta)
 						LB = LB_theta;
-
+					/*
 					IloExpr Sum1(env);
 					for (int j = 1; j < W + 1; ++j)
 						Sum1 += x[wp[j]][wt[j]];
@@ -509,6 +529,16 @@ bool TwoPhase::Solve(double timeLimit, double* TwoPhase_Iter, double* TwoPhase_C
 					for (int k = 1; k < (PP.P * PP.T - W + 1); ++k)
 						Sum2 += x[wop[k]][wot[k]];
 					cout << Sum2 << endl;
+					*/
+
+					IloExpr Sum1(env);
+					IloExpr Sum2(env);
+					for (int p = 0; p < PP.P; ++p)
+						for (int t = 0; t < PP.T; ++t)
+							if (x_val[p][t] >= 0.5)
+								Sum1 += x[p][t];
+							else
+								Sum2 += x[p][t];
 
 					IloExpr OptCut(env);
 					OptCut = Sum1 - Sum2;

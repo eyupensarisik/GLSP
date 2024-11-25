@@ -27,6 +27,7 @@
     <ClCompile Include="..\Subproblems.cpp" />
     <ClCompile Include="..\TwoPhase.cpp" />
     <ClCompile Include="..\TwoPhase_Callback.cpp" />
+    <ClCompile Include="DPmultiperiod.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\Common.h" />
@@ -136,7 +137,7 @@
     </Midl>
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>C:\Program Files\IBM\ILOG\CPLEX_Studio201\cplex\include;C:\Program Files\IBM\ILOG\CPLEX_Studio201\concert\include;C:\Program Files\IBM\ILOG\CPLEX_Studio_Community2211\cplex\include;C:\Program Files\IBM\ILOG\CPLEX_Studio_Community2211\concert\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Program Files\IBM\ILOG\CPLEX_Studio2211\cplex\include;C:\Program Files\IBM\ILOG\CPLEX_Studio2211\concert\include;C:\Program Files\IBM\ILOG\CPLEX_Studio2211\cpoptimizer\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;IL_STD;%(PreprocessorDefinitions);_SCL_SECURE_NO_WARNINGS</PreprocessorDefinitions>
       <MinimalRebuild>false</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -148,8 +149,8 @@
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>ilocplex.lib;concert.lib;cplex2010.lib;cplex2211.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>C:\Program Files\IBM\ILOG\CPLEX_Studio201\cplex\lib\x64_windows_msvc14\stat_mdd;C:\Program Files\IBM\ILOG\CPLEX_Studio201\concert\lib\x64_windows_msvc14\stat_mdd;C:\Program Files\IBM\ILOG\CPLEX_Studio_Community2211\cplex\lib\x64_windows_msvc14\stat_mdd;C:\Program Files\IBM\ILOG\CPLEX_Studio_Community2211\concert\lib\x64_windows_msvc14\stat_mdd;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>ilocplex.lib;concert.lib;cplex2211.lib;cp.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\Program Files\IBM\ILOG\CPLEX_Studio2211\cplex\lib\x64_windows_msvc14\stat_mdd;C:\Program Files\IBM\ILOG\CPLEX_Studio2211\concert\lib\x64_windows_msvc14\stat_mdd;C:\Program Files\IBM\ILOG\CPLEX_Studio2211\cpoptimizer\lib\x64_windows_msvc14\stat_mdd;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Console</SubSystem>
       <RandomizedBaseAddress>false</RandomizedBaseAddress>
