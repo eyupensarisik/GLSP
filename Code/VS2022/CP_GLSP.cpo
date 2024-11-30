@@ -1,0 +1,51 @@
+// --------------------------------------------------------------------------
+// IBM ILOG CP Optimizer model export file
+// Effective workers: 48
+// --------------------------------------------------------------------------
+
+// ------ Internal data: ----------------------------------------------------
+
+internals {
+  version(22.1.1.0);
+  architecture("x64_windows_msvc14/stat_mdd", 64);
+}
+
+// ------ Interval-related variables: ---------------------------------------
+
+"Y@0" = intervalVar(size=1);
+"Y@1" = intervalVar(size=1);
+"Y@2" = intervalVar(size=1);
+"Y@3" = intervalVar(size=1);
+"Y@4" = intervalVar(size=1);
+"Y@5" = intervalVar(size=1);
+"Y@6" = intervalVar(size=1);
+"Y@7" = intervalVar(size=1);
+"Y@8" = intervalVar(size=1);
+V = sequenceVar(["Y@0", "Y@1", "Y@2", "Y@3", "Y@4", "Y@5", "Y@6", "Y@7", "Y@8"], [0..8]);
+
+// ------ Objective: --------------------------------------------------------
+
+minimize(sum([element([0, 0, 0, 532, 532, 532, 785, 785, 785], typeOfNext(V, "Y@0")), element([0, 0, 0, 532, 532, 532, 785, 785, 785], typeOfNext(V, "Y@1", 1)), element([0, 0, 0, 532, 532, 532, 785, 785, 785], typeOfNext(V, "Y@2", 2)), element([860, 860, 860, 0, 0, 0, 970, 970, 970], typeOfNext(V, "Y@3", 3)), element([860, 860, 860, 0, 0, 0, 970, 970, 970], typeOfNext(V, "Y@4", 4)), element([860, 860, 860, 0, 0, 0, 970, 970, 970], typeOfNext(V, "Y@5", 5)), element([985, 985, 985, 714, 714, 714, 0, 0, 0], typeOfNext(V, "Y@6", 6)), element([985, 985, 985, 714, 714, 714, 0, 0, 0], typeOfNext(V, "Y@7", 7)), element([985, 985, 985, 714, 714, 714, 0, 0, 0], typeOfNext(V, "Y@8", 8))]));
+
+// ------ Constraints: ------------------------------------------------------
+
+noOverlap(V);
+startOf("Y@0") >= 0;
+startOf("Y@1") >= 2005;
+startOf("Y@2") >= 3292;
+startOf("Y@3") >= 0;
+startOf("Y@4") >= 2005;
+startOf("Y@5") >= 3292;
+startOf("Y@6") >= 0;
+startOf("Y@7") >= 2005;
+startOf("Y@8") >= 3292;
+endOf("Y@0") <= 2005;
+endOf("Y@1") <= 3292;
+endOf("Y@2") <= 4721;
+endOf("Y@3") <= 2005;
+endOf("Y@4") <= 3292;
+endOf("Y@5") <= 4721;
+endOf("Y@6") <= 2005;
+endOf("Y@7") <= 3292;
+endOf("Y@8") <= 4721;
+

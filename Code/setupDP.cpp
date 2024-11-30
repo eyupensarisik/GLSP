@@ -13,36 +13,11 @@ setupDP::setupDP()
 {
 }
 
-int setupDP::MinSetup(map<pair<int, set<int>>, int>& Cache, const Matrix& Setups, int Prev, set<int>& Current)
+int setupDP::SetupBetween(const Matrix& Setups, int i, int j)
 {
-    auto [it, inserted] = Cache.try_emplace(make_pair(Prev, Current));
-    if (inserted)
-    {
-        int Min = INT_MAX;
-        for (auto i : Current)
-        {
-            if (i == Prev)
-                continue;
-            else
-            {
-                auto CurrentCopy = Current;
-                CurrentCopy.erase(i);
-                int Setup = 0;
-                if (Prev != -1) {
-                    Setup = Setups[Prev][i];
-                }
-                if (!CurrentCopy.empty())
-                    Setup += MinSetup(Cache, Setups, i, CurrentCopy);
-                if (Setup < Min) {
-                    Min = Setup;
-                }
-            }
-        }
-        it->second = Min;
-    }
-    else
-        int i = 4;
-    return it->second;
+    if (i >= 0 && i < Setups.size() && j >= 0 && j < Setups[i].size())
+        return Setups[i][j];
+    return 0;
 }
 
 int setupDP::MinSetupMiddle(CacheMP& cache, const Matrix& Setups, int First, ProductSet& Middle, int Last)
@@ -53,36 +28,46 @@ int setupDP::MinSetupMiddle(CacheMP& cache, const Matrix& Setups, int First, Pro
         int Min = INT_MAX;
         if (First == -1)
         {
-            auto MiddleCopy = Middle;
-            for (auto i : Middle)
+            if (Middle.empty())
+                Min = 0;
+            else
             {
-                MiddleCopy.erase(i);
-                auto Setup = MinSetupMiddle(cache, Setups, i, MiddleCopy, Last);
-                if (Setup < Min)
-                    Min = Setup;
-                MiddleCopy.insert(i);
+                auto MiddleCopy = Middle;
+                for (auto i : Middle)
+                {
+                    MiddleCopy.erase(i);
+                    auto Setup = MinSetupMiddle(cache, Setups, i, MiddleCopy, Last);
+                    if (Setup < Min)
+                        Min = Setup;
+                    MiddleCopy.insert(i);
+                }
             }
         }
         else if (Last == -1)
         {
-            auto MiddleCopy = Middle;
-            for (auto i : Middle)
+            if (Middle.empty())
+                Min = 0;
+            else
             {
-                MiddleCopy.erase(i);
-                auto Setup = MinSetupMiddle(cache, Setups, First, MiddleCopy, i);
-                if (Setup < Min)
-                    Min = Setup;
-                MiddleCopy.insert(i);
+                auto MiddleCopy = Middle;
+                for (auto i : Middle)
+                {
+                    MiddleCopy.erase(i);
+                    auto Setup = MinSetupMiddle(cache, Setups, First, MiddleCopy, i);
+                    if (Setup < Min)
+                        Min = Setup;
+                    MiddleCopy.insert(i);
+                }
             }
         }
         else if (Middle.empty())
         {
-            Min = Setups[First][Last];
+            Min = SetupBetween(Setups, First, Last);
         }
         else if (Middle.size() == 1)
         {
             int Mid = *Middle.begin();
-            Min = Setups[First][Mid] + Setups[Mid][Last];
+            Min = SetupBetween(Setups, First, Mid) + SetupBetween(Setups, Mid, Last);
         }
         else
         {
@@ -90,13 +75,15 @@ int setupDP::MinSetupMiddle(CacheMP& cache, const Matrix& Setups, int First, Pro
             for (auto i : Middle)
             {
                 MiddleCopy.erase(i);
-                int Setup = Setups[First][i];
+                int Setup = SetupBetween(Setups, First, i);
                 Setup += MinSetupMiddle(cache, Setups, i, MiddleCopy, Last);
                 if (Setup < Min)
                     Min = Setup;
                 MiddleCopy.insert(i);
             }
         }
+        if (Min == INT_MAX)
+            int i = 4;
         it->second = Min;
     }
     return it->second;
@@ -105,7 +92,7 @@ int setupDP::MinSetupMiddle(CacheMP& cache, const Matrix& Setups, int First, Pro
 int setupDP::MinSetupMultiPeriod(CacheMP& cache, const Matrix& Setups, int First, vector<ProductSet>& Middle, int Last)
 {
     if (Middle.empty())
-        return Setups[First][Last];
+        return SetupBetween(Setups, First, Last);
     else if (Middle.size() == 1)
         return MinSetupMiddle(cache, Setups, First, Middle.front(), Last);
     else
@@ -115,33 +102,62 @@ int setupDP::MinSetupMultiPeriod(CacheMP& cache, const Matrix& Setups, int First
 
         map<int, int> LeftSetups;
         auto LeftLastCopy = Left.back();
+        if (LeftLastCopy.size() > 1) {
         for (auto i : LeftLastCopy)
         {
             Left.back().erase(i);
             LeftSetups[i] = MinSetupMultiPeriod(cache, Setups, First, Left, i);
             Left.back().insert(i);
         }
+        }
+        else {
+            for (auto i : LeftLastCopy)
+                LeftSetups[i] = MinSetupMultiPeriod(cache, Setups, First, Left, i);
+        }
 
         vector<ProductSet> Right(Middle.begin() + Split, Middle.end());
         map<int, int> RightSetups;
         auto RightFirstCopy = Right.front();
-        for (auto i : RightFirstCopy)
-        {
-            Right.front().erase(i);
-            RightSetups[i] = MinSetupMultiPeriod(cache, Setups, i, Right, Last);
-            Right.front().insert(i);
+        if (RightFirstCopy.size() > 1){
+            for (auto i : RightFirstCopy)
+            {
+                Right.front().erase(i);
+                RightSetups[i] = MinSetupMultiPeriod(cache, Setups, i, Right, Last);
+                Right.front().insert(i);
+            }
+        }
+        else {
+            for (auto i : RightFirstCopy)
+                RightSetups[i] = MinSetupMultiPeriod(cache, Setups, i, Right, Last);
         }
 
         int MinSetup = INT_MAX;
-        for (auto l : LeftSetups)
-            for (auto r : RightSetups)
-            {
-                int Setup = Setups[l.first][r.first];
-                Setup += l.second;
-                Setup += r.second;
-                if (Setup < MinSetup)
-                    MinSetup = Setup;
-            }
+        if (LeftSetups.empty() && RightSetups.empty())
+            MinSetup = 0;
+        else if (LeftSetups.empty())
+        {
+            for (auto r : RightSetups) 
+                if (r.second < MinSetup)
+                    MinSetup = r.second;
+        }
+        else if (RightSetups.empty())
+        {
+            for (auto l : LeftSetups)
+                if (l.second < MinSetup)
+                    MinSetup = l.second;
+        }
+        else
+        {
+            for (auto l : LeftSetups)
+                for (auto r : RightSetups)
+                {
+                    int Setup = SetupBetween(Setups, l.first, r.first);
+                    Setup += l.second;
+                    Setup += r.second;
+                    if (Setup < MinSetup)
+                        MinSetup = Setup;
+                }
+        }
         return MinSetup;
     }
 }

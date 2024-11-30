@@ -1,6 +1,6 @@
 @ECHO OFF
 
-set BINDIR=x64\Debug
+set BINDIR=x64\Release
 set DATADIR=..\..\Data\%1
 set PARAMFILE=..\Run\Parameters\%2.txt
 set RESULTDIR=Results\%1_%2_%3_%4
@@ -21,10 +21,13 @@ TwoPhase_CPU,^
 TwoPhase_LB,^
 TwoPhase_UB,^
 TwoPhase_Obj,^
+TwoPhase_Gap,^
 TwoPhase_Callback_CPU,^
 TwoPhase_Callback_Call,^
 SP_Cons_CPU,^
 SP_Solve_CPU,^
+Nconsts,^
+Nvars,^
  > %RESULTDIR%\%SUMMARYFILE%
 
 FOR %%f IN (%DATADIR%\*.dat) DO (

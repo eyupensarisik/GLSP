@@ -6,7 +6,7 @@
 
 typedef vector<vector<double>> Matrix;
 
-Subproblems::Subproblems(ProductPeriods& PPIn, ParameterMap& PM) : PP(PPIn), Parameters(PM), SPmodel(SPenv), SPcplex(SPenv)
+Subproblems::Subproblems(ProductPeriods& PPIn, ParameterMap& PM) : PP(PPIn), Parameters(PM), SPmodel(SPenv), SPcplex(SPenv), CPmodel(CPenv), CPcplex(CPenv)
 {
 	BestBoundThreshold = DBL_MAX;
 }
@@ -14,11 +14,14 @@ Subproblems::Subproblems(ProductPeriods& PPIn, ParameterMap& PM) : PP(PPIn), Par
 Subproblems::~Subproblems()
 {
 	SPenv.end();
+	CPenv.end();
 }
 
 void Subproblems::SetupBSPModel(int W, vector<int> wp, vector<int> wt, vector<int> wop, vector<int> wot)
 {
-	// Setup BSP Subroblem
+	// Setup Batching and Scheduling Subroblem (BSP)
+
+	//Find due-dates and release dates
 	vector<int> dd;
 	dd.resize(PP.T);
 	vector<int> rd;
@@ -30,6 +33,7 @@ void Subproblems::SetupBSPModel(int W, vector<int> wp, vector<int> wt, vector<in
 		dd[t] = d_sum;
 	}
 
+	//Calculate the Big M value
 	int TotalCapacity = 0;
 	for (int t = 0; t < PP.T; ++t)
 		TotalCapacity += PP.K[t];
@@ -59,13 +63,6 @@ void Subproblems::SetupBSPModel(int W, vector<int> wp, vector<int> wt, vector<in
 	SP_b[0] = 0;
 	SP_b[W + 1] = 0;
 
-	vector<int> SP_h;
-	SP_h.resize(W + 2);
-	for (int j = 1; j < W + 1; ++j)
-		SP_h[j] = PP.Products[wp[j]].h;
-	SP_h[0] = 0;
-	SP_h[W + 1] = 0;
-
 	SP_setup.resize(W + 1);
 	for (int j = 0; j < W + 1; ++j)
 		SP_setup[j].resize(W + 1);
@@ -75,8 +72,8 @@ void Subproblems::SetupBSPModel(int W, vector<int> wp, vector<int> wt, vector<in
 			SP_setup[j][l] = PP.Products[wp[j]].s_pr[wp[l]];
 		}
 
-	C = CreateNumVarArray(SPenv, W + 2, "C", 0, IloInfinity);
-	e = CreateBoolVarArray2(SPenv, W + 2, W + 2, "e");
+	C = CreateNumVarArray(SPenv, W + 2, "C", 0, IloInfinity); //The completion time of job j
+	e = CreateBoolVarArray2(SPenv, W + 2, W + 2, "e"); //1 if job j is scheduled just before job l; and, 0 otherwise
 
 	IloExpr SPobj1(SPenv);
 	for (int j = 1; j < W + 1; ++j)
@@ -122,15 +119,14 @@ void Subproblems::SetupBSPModel(int W, vector<int> wp, vector<int> wt, vector<in
 	for (int j = 0; j < W + 1; ++j) {
 		SPmodel.add(C[j] >= SP_a[j] + SP_r[j]);
 	}
-
-	//SPcplex.exportModel("SP_GLSP.lp");
-
 }
 
-bool Subproblems::BSP_Solve()
+bool Subproblems::BSP_Solve(double timeLimit)
 {
 	if (GetParameterValue(Parameters, "THREAD_COUNT"))
 		SPcplex.setParam(IloCplex::Threads, GetParameterValue(Parameters, "THREAD_COUNT"));
+	if (timeLimit > 0)
+		SPcplex.setParam(IloCplex::TiLim, timeLimit);
 
 	try
 	{
@@ -167,4 +163,120 @@ Matrix Subproblems::GetBSP_Solutions(int W)
 				e_val[j][l] = SPcplex.getValue(e[j][l]);
 
 	return e_val;
+}
+
+void Subproblems::SetupCPModel(int W, vector<int> wp, vector<int> wt, vector<int> wop, vector<int> wot)
+{
+	// Setup Constraint Programming Subroblem (CP)
+
+	//Find due-dates and release dates
+	vector<int> dd;
+	dd.resize(PP.T);
+	vector<int> rd;
+	rd.resize(PP.T);
+	int d_sum = 0;
+	for (int t = 0; t < PP.T; ++t) {
+		rd[t] = d_sum;
+		d_sum += PP.K[t];
+		dd[t] = d_sum;
+	}
+
+	//Construct Subproblem
+
+	vector<int> SP_a;
+	SP_a.resize(W);
+	for (int j = 0; j < W; ++j)
+		SP_a[j] = PP.Products[wp[j+1]].a;
+
+	vector<int> SP_b;
+	SP_b.resize(W);
+	for (int j = 0; j < W; ++j)
+		SP_b[j] = dd[wt[j+1]];
+
+	vector<int> SP_r;
+	SP_r.resize(W);
+	for (int j = 0; j < W; ++j)
+		SP_r[j] = rd[wt[j+1]];
+
+	SP_setup.resize(W);
+	for (int j = 0; j < W; ++j)
+		SP_setup[j].resize(W);
+
+	for (int j = 0; j < W; ++j)
+		for (int l = 0; l < W; ++l) {
+			SP_setup[j][l] = PP.Products[wp[j+1]].s_pr[wp[l+1]];
+		}
+
+	IntArray2 iloSetup = CreateIntArray2(CPenv, W, W);
+	for (int j = 0; j < W; ++j)
+		for (int l = 0; l < W; ++l) {
+			iloSetup[j][l] = SP_setup[j][l];
+		}
+
+	IloIntArray type(CPenv, W);
+	for (int j = 0; j < W; ++j)
+		type[j] = j;
+
+	IloIntervalVarArray Y(CPenv, W);
+	for (int j = 0; j < W; j++)
+	{
+		Y[j] = IloIntervalVar(CPenv, SP_a[j], "Y");
+		Y[j].setPresent();
+	}
+
+	IloIntervalSequenceVar V (CPenv, Y, type, "V");
+
+	IloExpr CPobj1(CPenv);
+	for (int j = 0; j < W; j++){
+		IloIntExpr l = IloTypeOfNext(V, Y[j], j);
+		CPobj1 += IloElement(iloSetup[j], l);
+	}
+
+	CPobj = IloMinimize(CPenv, CPobj1);
+	CPmodel.add(CPobj);
+
+	CPcplex = IloCP(CPmodel);
+
+	CPmodel.add(IloNoOverlap(CPenv, V));
+
+	for (int j = 0; j < W; j++)
+		CPmodel.add(IloStartOf(Y[j], 0) >= SP_r[j]);
+
+	for (int j = 0; j < W; j++)
+		CPmodel.add(IloEndOf(Y[j], 0) <= SP_b[j]);
+}
+
+bool Subproblems::CP_Solve(double timeLimit)
+{
+	if (GetParameterValue(Parameters, "THREAD_COUNT"))
+		CPcplex.setParameter(IloCP::Workers, GetParameterValue(Parameters, "THREAD_COUNT"));
+	if (timeLimit > 0)
+		CPcplex.setParameter(IloCP::TimeLimit, timeLimit);
+
+	try
+	{
+		//CPcplex.exportModel("CP_GLSP.cpo");
+		Solved = CPcplex.solve();
+	}
+	catch (IloException& ex)
+	{
+		cout << ex.getMessage() << endl;
+	}
+
+	return Solved;
+}
+
+double Subproblems::GetCP_Obj()
+{
+	return Solved ? CPcplex.getObjValue() : DBL_MAX;
+}
+
+double Subproblems::GetCP_Bound()
+{
+	return Solved ? CPcplex.getObjBound() : 0;
+}
+
+double Subproblems::GetCP_Gap()
+{
+	return Solved ? CPcplex.getObjGap() : 100;
 }

@@ -4,6 +4,7 @@
 
 #include "Common.h"
 #include "DataPrep.h"
+#include "setupDP.h"
 #include <unordered_map>
 #include <list>
 
@@ -33,16 +34,21 @@ struct TwoPhase
 	ProductPeriods& PP;
 	ParameterMap& Parameters;
 
+	setupDP sDP;
+	CacheMP MPcache;
+
 	IntegerVector InitialSolution;
 
 	int IntegerSolutionLimit = INT_MAX;
+
+	double SPtimelimit;
 
 	int LB_theta;
 
 	TwoPhase(ProductPeriods& PPIn, ParameterMap& PM);
 	~TwoPhase();
 
-	void SetupModel();
+	void SetupModel(double timeLimit);
 	void SetIntegerSolutionLimit(int i) { IntegerSolutionLimit = i; }
 	bool Solve(double timeLimit, double* TwoPhase_Iter, double* TwoPhase_Cut, double* TwoPhase_CPU, double* TwoPhase_UB, double* TwoPhase_LB, double* SP_Cons_CPU, double* SP_Solve_CPU, double* MP_CPU, int SPtype);
 	double GetCPUTime() { return CPU; }

@@ -12,17 +12,17 @@ GLSP::~GLSP()
 }
 
 
-void GLSP::SetupModel_S(double timeLimit)
+void GLSP::SetupModel_S(double timeLimit) //Setup the standard model
 {
-	int P = PP.P;
-	int T = PP.T;
-	int S = PP.S;
+	int P = PP.P; //The set of products, denoted by p
+	int T = PP.T; //The set of macro - periods
+	int S = PP.S; //The set of micro - periods
 
-	I = CreateNumVarArray2(env, P, T, "I", 0, IloInfinity);
-	q = CreateNumVarArray2(env, P, S, "q", 0, IloInfinity);
+	I = CreateNumVarArray2(env, P, T, "I", 0, IloInfinity); //Inventory level of product p at the end of macro-period t
+	q = CreateNumVarArray2(env, P, S, "q", 0, IloInfinity); //Amount of product p produced in micro - period s
 
-	y = CreateBoolVarArray2(env, P, S, "y");
-	z = CreateBoolVarArray3(env, P, P, S, "z");
+	y = CreateBoolVarArray2(env, P, S, "y"); //1, if the machine is prepared for the product p in micro - period s; 0, otherwise
+	z = CreateBoolVarArray3(env, P, P, S, "z"); //1 if the transition from product p to r occurs at the beginning of micro - period s, 0 otherwise
 
 	// Constraint (2)
 	for (int p = 0; p < P; ++p)
@@ -127,17 +127,17 @@ void GLSP::SetupModel_S(double timeLimit)
 	
 }
 
-void GLSP::SetupModel_NF(double timeLimit)
+void GLSP::SetupModel_NF(double timeLimit) //Setup the network-flow model
 {
-	int P = PP.P;
-	int T = PP.T;
-	int S = PP.S;
+	int P = PP.P; //The set of products, denoted by p
+	int T = PP.T; //The set of macro - periods
+	int S = PP.S; //The set of micro - periods
 
-	I = CreateNumVarArray2(env, P, T, "I", 0, IloInfinity);
-	q = CreateNumVarArray2(env, P, S, "q", 0, IloInfinity);
+	I = CreateNumVarArray2(env, P, T, "I", 0, IloInfinity); //Inventory level of product p at the end of macro-period t
+	q = CreateNumVarArray2(env, P, S, "q", 0, IloInfinity); //Amount of product p produced in micro - period s
 
-	y = CreateBoolVarArray2(env, P, S, "y");
-	z = CreateBoolVarArray3(env, P, P, S, "z");
+	y = CreateBoolVarArray2(env, P, S, "y"); //1, if the machine is prepared for the product p in micro - period s; 0, otherwise
+	z = CreateBoolVarArray3(env, P, P, S, "z"); //1 if the transition from product p to r occurs at the beginning of micro - period s, 0 otherwise
 
 	// Constraint (2)
 	for (int p = 0; p < P; ++p)

@@ -24,18 +24,16 @@ struct Worker
 
 	Worker(TwoPhaseC* pTwoPhaseC);
 
-	virtual bool separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_theta, const IloNum thetaVal, const NumArray2& xSol, double& OptimalCost,
-		IloExpr& cutLhs, IloExpr& cutGMs, IloExpr& Sum1, IloExpr& Sum2, IloExpr& GMCut, IloExprArray& DPCut, IloExprArray& cutDPs, 
-		Matrix setup_pr) = 0;
+	virtual bool separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_theta, CacheMP& MPcache, const IloNum thetaVal, const NumArray2& xSol, double& OptimalCost,
+		IloExprArray& cuts) = 0;
 };
 
 struct WorkerWW : public Worker
 {
 	WorkerWW(TwoPhaseC* pTwoPhaseC);
 
-	bool separate(ProductPeriods& PP, ParameterMap& Parameters,  int& LB_theta, const IloNum thetaVal, const NumArray2& xSol, double& OptimalCost,
-		IloExpr& cutLhs, IloExpr& cutGMs, IloExpr& Sum1, IloExpr& Sum2, IloExpr& GMCut, IloExprArray& DPCut, IloExprArray& cutDPs, 
-		Matrix setup_pr);
+	bool separate(ProductPeriods& PP, ParameterMap& Parameters,  int& LB_theta, CacheMP& MPcache, const IloNum thetaVal, const NumArray2& xSol, double& OptimalCost,
+		 IloExprArray& cuts);
 };
 
 struct TwoPhaseCallback : public IloCplex::Callback::Function
@@ -85,24 +83,30 @@ struct TwoPhaseC
 	double W_SPcons_time = 0;
 
 	setupDP sDP;
-	map <pair<int, set<int>>, int> Cache;
 	Matrix setup_pr;
+	CacheMP MPcache;
 
 	list<IloConstraint> GeneratedCuts;
+
+	double SPtimelimit;
 
 	TwoPhaseC(ProductPeriods& PPIn, ParameterMap& PM);
 	~TwoPhaseC();
 
-	void SetupModel();
+	void SetupModel(double timeLimit);
 	void SetIntegerSolutionLimit(int i) { IntegerSolutionLimit = i; }
 	bool Solve(double timeLimit);
 	double GetCPUTime() { return CPU; }
 	double GetLB();
 	double GetUB();
+	double GetGap();
 	double GetCallbackCPU();
 	size_t GetCallCount();
 	size_t GetCutCount();
 	double GetSPconsCPU();
 	double GetSPsolveCPU();
+	int GetConsts();
+	int GetVars();
+
 };
 #endif

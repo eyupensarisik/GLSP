@@ -1,0 +1,2 @@
+Name,P,T,TwoPhase_Callback_Cut,TwoPhase_CPU,TwoPhase_LB,TwoPhase_UB,TwoPhase_Obj,TwoPhase_Callback_CPU,TwoPhase_Callback_Call,SP_Cons_CPU,SP_Solve_CPU, 
+Results\SingleMachineCapVar22_TwoPhase_Callback_5_5\Data1-15-15-0.6-0.5-100-100-100-4.dat,5,5,3863,163.219,9798.08,9799,9799,0.051,3883,0,0.044

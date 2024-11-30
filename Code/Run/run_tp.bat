@@ -1,6 +1,6 @@
 @ECHO OFF
 
-set BINDIR=x64\Debug
+set BINDIR=x64\Release
 set DATADIR=..\..\Data\%1
 set PARAMFILE=..\Run\Parameters\%2.txt
 set RESULTDIR=Results\%1_%2_%3_%4

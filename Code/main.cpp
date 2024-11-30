@@ -8,11 +8,11 @@
 typedef vector<vector<double>> Matrix;
 using namespace std::chrono;
 
-#if 0
+#if 1
 
 int main(int nParams, char* params[])
 {
-	string inputFileName = (nParams > 1 ? params[1] : "../../Data/SingleMachineCapVar2/Data1-15-15-0.6-0.5-100-100-100-0.dat");
+	string inputFileName = (nParams > 1 ? params[1] : "../../Data/SingleMachineCapVar2/Data1-15-15-0.6-0.5-100-100-100-4.dat");
 	string inputFileNameOnly;
 
 	auto fileNameBegin = inputFileName.find_last_of("/\\");
@@ -30,10 +30,10 @@ int main(int nParams, char* params[])
 	string outputFileName = (nParams > 2 ? params[2] : inputFileNameOnly + "_result.csv");
 	string summaryFileName = (nParams > 3 ? params[3] : "summary.csv");
 
-	string parameterFileName = (nParams > 4 ? params[4] : "../Run/Parameters/TwoPhase.txt");
+	string parameterFileName = (nParams > 4 ? params[4] : "../Run/Parameters/TwoPhase_Callback.txt");
 
-	int pOverride = 4;// stoi((nParams > 5 ? params[5] : "0"));
-	int tOverride = 4;//stoi((nParams > 6 ? params[6] : "0"));
+	int pOverride = 5;// stoi((nParams > 5 ? params[5] : "0"));
+	int tOverride = 5;//stoi((nParams > 6 ? params[6] : "0"));
 
 	ParameterMap Parameters;
 	ReadParameterMapFromFile(Parameters, parameterFileName);
@@ -61,7 +61,7 @@ int main(int nParams, char* params[])
 		}
 		else if (GetParameterValue(Parameters, "TWO_PHASE_CALLBACK"))
 		{
-			summaryFile << "Name,P,T,TwoPhase_Cut,TwoPhase_CPU,TwoPhase_UB,TwoPhase_LB,TwoPhase_Obj,TwoPhase_Callback_CPU,TwoPhase_Callback_Cut,SP_Cons_CPU,SP_Solve_CPU" << endl;
+			summaryFile << "Name,P,T,TwoPhase_Cut,TwoPhase_CPU,TwoPhase_LB,TwoPhase_UB,TwoPhase_Obj,TwoPhase_Gap,TwoPhase_Callback_CPU,TwoPhase_Callback_Cut,SP_Cons_CPU,SP_Solve_CPU,Nconsts,Nvars" << endl;
 		}
 	}
 
@@ -89,13 +89,6 @@ int main(int nParams, char* params[])
 
 		if (GetParameterValue(Parameters, "GLSP_Standard"))
 		{
-			double CPUTime_GLSP = 0;
-			double SolveTime_GLSP = 0;
-			double ObjVal = 0;
-			double RelativeGap_GLSP = 0;
-			int Nconsts = 0;
-			int Nvars = 0;
-
 			GLSP glsp(PP, Parameters);
 
 
@@ -104,11 +97,11 @@ int main(int nParams, char* params[])
 			glsp.Solve(timeLimit);
 			cout << "Finished solving GLSP_Standard. UB: " << glsp.GetUB() << " LB: " << glsp.GetLB() << endl;
 
-			CPUTime_GLSP = glsp.GetCPUTime();
-			ObjVal = glsp.GetUB();
-			RelativeGap_GLSP = glsp.GetGap();
-			Nconsts = glsp.GetConsts();
-			Nvars = glsp.GetVars();
+			double CPUTime_GLSP = glsp.GetCPUTime();
+			double ObjVal = glsp.GetUB();
+			double RelativeGap_GLSP = glsp.GetGap();
+			int Nconsts = glsp.GetConsts();
+			int Nvars = glsp.GetVars();
 			glsp.GetSolutions(PP.P, PP.T, PP.S);
 
 			if (summaryFile)
@@ -127,13 +120,6 @@ int main(int nParams, char* params[])
 		}
 		else if (GetParameterValue(Parameters, "GLSP_NF"))
 		{
-			double CPUTime_GLSP = 0;
-			double SolveTime_GLSP = 0;
-			double ObjVal = 0;
-			double RelativeGap_GLSP = 0;
-			int Nconsts = 0;
-			int Nvars = 0;
-
 			GLSP glsp(PP, Parameters);
 
 			cout << "Started solving GLSP_NF" << endl;
@@ -141,11 +127,11 @@ int main(int nParams, char* params[])
 			glsp.Solve(timeLimit);
 			cout << "Finished solving GLSP_NF. UB: " << glsp.GetUB() << " LB: " << glsp.GetLB() << endl;
 
-			CPUTime_GLSP = glsp.GetCPUTime();
-			ObjVal = glsp.GetUB();
-			RelativeGap_GLSP = glsp.GetGap();
-			Nconsts = glsp.GetConsts();
-			Nvars = glsp.GetVars();
+			double CPUTime_GLSP = glsp.GetCPUTime();
+			double ObjVal = glsp.GetUB();
+			double RelativeGap_GLSP = glsp.GetGap();
+			int Nconsts = glsp.GetConsts();
+			int Nvars = glsp.GetVars();
 			glsp.GetSolutions(PP.P, PP.T, PP.S);
 
 			if (summaryFile)
@@ -177,7 +163,7 @@ int main(int nParams, char* params[])
 			int SPtype = GetParameterValue(Parameters, "SUBPROBLEM_TYPE");
 
 			cout << "Started solving TwoPhase" << endl;
-			tp.SetupModel();
+			tp.SetupModel(timeLimit);
 			tp.Solve(timeLimit, &TwoPhase_Iter, &TwoPhase_Cut, &TwoPhase_CPU, &TwoPhase_LB, &TwoPhase_UB, &SP_Cons_CPU, &SP_Solve_CPU, &MP_CPU, SPtype);
 			cout << "Finished solving TwoPhase. UB: " << tp.GetUB() << " LB: " << tp.GetLB() << endl;
 
@@ -200,31 +186,24 @@ int main(int nParams, char* params[])
 		{
 			TwoPhaseC tpC(PP, Parameters);
 
-			double TwoPhase_Callback_CPU = 0;
-			double TwoPhase_Callback_Call = 0;
-			double TwoPhase_CPU = 0;
-			double TwoPhase_LB = 0;
-			double TwoPhase_UB = 0;
-			double TwoPhase_Obj = 0;
-			double TwoPhase_Cut = 0;
-			double SP_Cons_CPU = 0;
-			double SP_Solve_CPU = 0;
-
 			cout << "Started solving TwoPhase_Callback" << endl;
-			tpC.SetupModel();
+			tpC.SetupModel(timeLimit);
 			tpC.Solve(timeLimit);
 			
 			cout << "Finished solving TwoPhase_Callback. UB: " << tpC.GetUB() << " LB: " << tpC.GetLB() << endl;
 
-			TwoPhase_CPU = tpC.GetCPUTime();
-			TwoPhase_LB = tpC.GetLB();
-			TwoPhase_UB = tpC.GetUB();
-			TwoPhase_Obj = tpC.GetUB();
-			TwoPhase_Callback_CPU += tpC.GetCallbackCPU();
-			TwoPhase_Callback_Call += tpC.GetCallCount();
-			TwoPhase_Cut += tpC.GetCutCount();
-			SP_Cons_CPU = tpC.GetSPconsCPU();
-			SP_Solve_CPU = tpC.GetSPsolveCPU();
+			double TwoPhase_CPU = tpC.GetCPUTime();
+			double TwoPhase_LB = tpC.GetLB();
+			double TwoPhase_UB = tpC.GetUB();
+			double TwoPhase_Obj = tpC.GetUB();
+			double TwoPhase_Gap = tpC.GetGap();
+			double TwoPhase_Callback_CPU = tpC.GetCallbackCPU();
+			double TwoPhase_Callback_Call = tpC.GetCallCount();
+			double TwoPhase_Cut = tpC.GetCutCount();
+			double SP_Cons_CPU = tpC.GetSPconsCPU();
+			double SP_Solve_CPU = tpC.GetSPsolveCPU();
+			int Nconsts = tpC.GetConsts();
+			int Nvars = tpC.GetVars();
 
 			if (summaryFile)
 			{
@@ -236,10 +215,13 @@ int main(int nParams, char* params[])
 					<< TwoPhase_LB << ","
 					<< TwoPhase_UB << ","
 					<< TwoPhase_Obj << ","
+					<< TwoPhase_Gap << ","
 					<< TwoPhase_Callback_CPU << ","
 					<< TwoPhase_Callback_Call << ","
 					<< SP_Cons_CPU << ","
-					<< SP_Solve_CPU << endl;
+					<< SP_Solve_CPU << ","
+					<< Nconsts << ","
+					<< Nvars << endl;
 			}
 
 		}

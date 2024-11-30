@@ -18,7 +18,7 @@ TwoPhase::~TwoPhase()
 	env.end();
 }
 
-void TwoPhase::SetupModel()
+void TwoPhase::SetupModel(double timeLimit)
 {
 	// Setup Master Problem
 	Matrix setup_pr;
@@ -105,47 +105,43 @@ void TwoPhase::SetupModel()
 		for (int p = 0; p < PP.P; ++p)
 			model.add(q[p][t] * PP.Products[p].a <= PP.K[t] * x[p][t]);
 
-	Subproblems SP(PP, Parameters);
+	vector<ProductSet> ProductPPs_In;
 
-	int W_In = PP.P;
-
-	vector<int> wp_In;
-	wp_In.resize(W_In + 2);
-	vector<int> wt_In;
-	wt_In.resize(W_In + 2);
-	vector<int> wop_In;
-	wop_In.resize(PP.P - W_In + 2);
-	vector<int> wot_In;
-	wot_In.resize(PP.P - W_In + 2);
-	int j = 0;
-	for (int p = 0; p < PP.P; ++p)
-		for (int t = 0; t < 1; ++t) {
-			j += 1;
-			wp_In[j] = p;
-			wt_In[j] = t;
+	for (int t = 0; t < PP.T; ++t) {
+		ProductSet MPcurrent;
+		for (int p = 0; p < PP.P; ++p) {
+			MPcurrent.insert(p);
 		}
+		ProductPPs_In.push_back(MPcurrent);
+	}
 
-	SP.SetupBSPModel(W_In, wp_In, wt_In, wop_In, wot_In);
-	SP.BSP_Solve();
+	vector<ProductSet> ProductPPsCopy;
+	for (int i = 0; i < ProductPPs_In.size(); ++i)
+	{
+		if (!ProductPPs_In[i].empty())
+			ProductPPsCopy.push_back(ProductPPs_In[i]);
+	}
+	ProductPPs_In = ProductPPsCopy;
 
-	LB_theta = SP.GetBSP_UB();
+	cout << "Finding minimum setup multiperiod" << endl;
+	cout << "Done. Minimum setup: " << sDP.MinSetupMultiPeriod(MPcache, setup_pr, -1, ProductPPs_In, -1) << endl;
+
+	if (!ProductPPs_In[0].empty())
+		LB_theta = sDP.MinSetupMiddle(MPcache, setup_pr, -1, ProductPPs_In[0], -1);
+
 	model.add(theta >= LB_theta);
 
 	double ValIn_setup = 0;
 	IloExpr ValIn(env);
 
-	setupDP sDP;
-	map <pair<int, set<int>>, int> Cache;
 	set<int> current;
-	for (int t = 0; t < PP.T; ++t){
+	for (int t = 0; t < PP.T; ++t) {
 		for (int p = 0; p < PP.P; ++p)
 			if (PP.Products[p].d[t] > 0)
 				current.insert(p);
 
 		if (!current.empty()) {
-			cout << "Finding minimum setup" << endl;
-			ValIn_setup = sDP.MinSetup(Cache, setup_pr, -1, current);
-			cout << "Done. Minimum setup: " << ValIn_setup << endl;
+			ValIn_setup = sDP.MinSetupMiddle(MPcache, setup_pr, -1, current, -1);
 		}
 
 		ValIn += theta_t[t];
@@ -163,14 +159,14 @@ void TwoPhase::SetupModel()
 		for (int p = 0; p < PP.P; ++p)
 			model.add(I[p][t - 1] >= PP.Products[p].d[t] * (1 - x[p][t]));
 
-	for (int p = 0; p < PP.P; ++p){
-		for (int t = 1; t < PP.T; ++t){
+	for (int p = 0; p < PP.P; ++p) {
+		for (int t = 1; t < PP.T; ++t) {
 			double eta;
 			double alpha;
 			for (int k = t; k < PP.T; ++k) {
 				IloExpr CapVal(env);
 				int d_pkt = 0;
-				for (int j = t; j < k + 1; ++j){
+				for (int j = t; j < k + 1; ++j) {
 					CapVal += x[p][j];
 					d_pkt += PP.Products[p].a * PP.Products[p].d[j];
 				}
@@ -181,6 +177,8 @@ void TwoPhase::SetupModel()
 			}
 		}
 	}
+
+	SPtimelimit = timeLimit;
 
 	cplex = IloCplex(model);
 
@@ -218,6 +216,7 @@ bool TwoPhase::Solve(double timeLimit, double* TwoPhase_Iter, double* TwoPhase_C
 
 		setupDP sDP;
 		map <pair<int, set<int>>, int> Cache;
+		CacheMP MPcache;
 
 		while (true)
 		{
@@ -231,12 +230,17 @@ bool TwoPhase::Solve(double timeLimit, double* TwoPhase_Iter, double* TwoPhase_C
 			{
 				double theta_hat = cplex.getValue(theta);
 				int W = 0;
-				for (int p = 0; p < PP.P; ++p) {
-					for (int t = 0; t < PP.T; ++t) {
+				vector<int> W_t;
+				W_t.resize(PP.T);
+				for (int t = 0; t < PP.T; ++t) {
+					int w = 0;
+					for (int p = 0; p < PP.P; ++p) {
 						if (cplex.getValue(x[p][t]) >= 1 - 0.0001) {
 							W += 1;
+							w += 1;
 						}
 					}
+					W_t[t] = w;
 				}
 
 				Matrix x_val;
@@ -264,35 +268,34 @@ bool TwoPhase::Solve(double timeLimit, double* TwoPhase_Iter, double* TwoPhase_C
 							q_hat[j] = cplex.getValue(q[p][t]);
 						}
 
+				vector<int> wp;
+				wp.resize(W + 2);
+				vector<int> wt;
+				wt.resize(W + 2);
+				vector<int> wop;
+				wop.resize(PP.P * PP.T - W + 2);
+				vector<int> wot;
+				wot.resize(PP.P * PP.T - W + 2);
+				j = 0;
+				int k = 0;
+				for (int p = 0; p < PP.P; ++p)
+					for (int t = 0; t < PP.T; ++t)
+						if (x_val[p][t] >= 1 - 0.0001) {
+							j += 1;
+							wp[j] = p;
+							wt[j] = t;
+						}
+						else {
+							k += 1;
+							wop[k] = p;
+							wot[k] = t;
+						}
 				
 				double nu_hat = 0;
 
 				if (SPtype == 0){
 					//Construct Subproblem
 					auto startSP_cons = chrono::high_resolution_clock::now(); //Start clock for SP
-
-					vector<int> wp;
-					wp.resize(W + 2);
-					vector<int> wt;
-					wt.resize(W + 2);
-					vector<int> wop;
-					wop.resize(PP.P * PP.T - W + 2);
-					vector<int> wot;
-					wot.resize(PP.P * PP.T - W + 2);
-					j = 0;
-					int k = 0;
-					for (int p = 0; p < PP.P; ++p)
-						for (int t = 0; t < PP.T; ++t)
-							if (x_val[p][t] >= 1 - 0.0001) {
-								j += 1;
-								wp[j] = p;
-								wt[j] = t;
-							}
-							else {
-								k += 1;
-								wop[k] = p;
-								wot[k] = t;
-							}
 
 					Subproblems SP(PP, Parameters);
 
@@ -303,7 +306,7 @@ bool TwoPhase::Solve(double timeLimit, double* TwoPhase_Iter, double* TwoPhase_C
 					TotalSPcons_time += SPcons_time.count();
 
 					auto startSP = chrono::high_resolution_clock::now(); //Start clock for SP
-					SP.BSP_Solve();
+					SP.BSP_Solve(SPtimelimit);
 
 					auto finishSP = chrono::high_resolution_clock::now();
 					auto SPtime = chrono::duration_cast<chrono::milliseconds>(finishSP - startSP);
@@ -312,7 +315,6 @@ bool TwoPhase::Solve(double timeLimit, double* TwoPhase_Iter, double* TwoPhase_C
 					nu_hat = SP.GetBSP_UB();
 					SP.GetBSP_Solutions(W);
 
-					CacheMP MPcache;
 					vector<ProductSet> ProductPPs;
 
 					for (int t = 0; t < PP.T; ++t) {
@@ -324,13 +326,23 @@ bool TwoPhase::Solve(double timeLimit, double* TwoPhase_Iter, double* TwoPhase_C
 						}
 						ProductPPs.push_back(MPcurrent);
 					}
-					int nu_hatt = 0;
-					nu_hatt = sDP.MinSetupMultiPeriod(MPcache, setup_pr, -1, ProductPPs, -1);
-
+					vector<ProductSet> ProductPPsCopy;
+					for (int i = 0; i < ProductPPs.size(); ++i)
+					{
+						if (!ProductPPs[i].empty())
+							ProductPPsCopy.push_back(ProductPPs[i]);
 					}
+					ProductPPs = ProductPPsCopy;
+
+					cout << "Finding minimum setup multiperiod" << endl;
+					int nu_hatt = sDP.MinSetupMultiPeriod(MPcache, setup_pr, -1, ProductPPs, -1);
+					if (nu_hatt - nu_hat < -1)
+						return 0;
+
+				}
 				else if (SPtype == 1){
 					auto startSP_cons = chrono::high_resolution_clock::now(); //Start clock for SP
-					CacheMP MPcache;
+					
 					vector<ProductSet> ProductPPs;
 
 					for (int t = 0; t < PP.T; ++t){
@@ -349,14 +361,40 @@ bool TwoPhase::Solve(double timeLimit, double* TwoPhase_Iter, double* TwoPhase_C
 
 					auto startSP = chrono::high_resolution_clock::now(); //Start clock for SP
 
-					cout << "Finding minimum setup multiperiod" << endl;
+					vector<ProductSet> ProductPPsCopy;
+					for (int i = 0; i < ProductPPs.size(); ++i)
+					{
+						if (!ProductPPs[i].empty())
+							ProductPPsCopy.push_back(ProductPPs[i]);
+					}
+					ProductPPs = ProductPPsCopy;
+
 					nu_hat = sDP.MinSetupMultiPeriod(MPcache, setup_pr, -1, ProductPPs, -1);
-					cout << "Done. Minimum setup: " << nu_hat << endl;
-					cout << "Cache size: " << MPcache.size() << endl;
 
 					auto finishSP = chrono::high_resolution_clock::now();
 					auto SPtime = chrono::duration_cast<chrono::milliseconds>(finishSP - startSP);
 					TotalSPtime += SPtime.count();
+				}
+				else if (SPtype == 2) {
+					//Construct Subproblem
+					auto startSP_cons = chrono::high_resolution_clock::now(); //Start clock for SP
+
+					Subproblems CP(PP, Parameters);
+
+					CP.SetupCPModel(W, wp, wt, wop, wot);
+
+					auto finishSP_cons = chrono::high_resolution_clock::now();
+					auto SPcons_time = chrono::duration_cast<chrono::milliseconds>(finishSP_cons - startSP_cons);
+					TotalSPcons_time += SPcons_time.count();
+
+					auto startSP = chrono::high_resolution_clock::now(); //Start clock for SP
+					CP.CP_Solve(SPtimelimit);
+
+					auto finishSP = chrono::high_resolution_clock::now();
+					auto SPtime = chrono::duration_cast<chrono::milliseconds>(finishSP - startSP);
+					TotalSPtime += SPtime.count();
+
+					nu_hat = CP.GetCP_Obj();
 				}
 
 				UB = cplex.getObjValue() - theta_hat + nu_hat;
@@ -473,9 +511,7 @@ bool TwoPhase::Solve(double timeLimit, double* TwoPhase_Iter, double* TwoPhase_C
 						}
 
 						if (!current.empty()) {
-							cout << "Finding minimum setup" << endl;
-							LBsetupDP = sDP.MinSetup(Cache, setup_pr, -1, current);
-							cout << "Done. Minimum setup: " << LBsetupDP << endl;
+							LBsetupDP = sDP.MinSetupMiddle(MPcache, setup_pr, -1, current, -1);
 						}
 						else
 							LBsetupDP = 0;
@@ -490,9 +526,7 @@ bool TwoPhase::Solve(double timeLimit, double* TwoPhase_Iter, double* TwoPhase_C
 									current.erase(p);
 
 								if (!current.empty()) {
-									cout << "Finding minimum setup" << endl;
-									LBsetupDP = sDP.MinSetup(Cache, setup_pr, -1, current);
-									cout << "Done. Minimum setup: " << LBsetupDP << endl;
+									LBsetupDP = sDP.MinSetupMiddle(MPcache, setup_pr, -1, current, -1);
 								}
 								else
 									LBsetupDP = 0;
@@ -519,17 +553,6 @@ bool TwoPhase::Solve(double timeLimit, double* TwoPhase_Iter, double* TwoPhase_C
 
 					if (LB < LB_theta)
 						LB = LB_theta;
-					/*
-					IloExpr Sum1(env);
-					for (int j = 1; j < W + 1; ++j)
-						Sum1 += x[wp[j]][wt[j]];
-					cout << Sum1 << endl;
-
-					IloExpr Sum2(env);
-					for (int k = 1; k < (PP.P * PP.T - W + 1); ++k)
-						Sum2 += x[wop[k]][wot[k]];
-					cout << Sum2 << endl;
-					*/
 
 					IloExpr Sum1(env);
 					IloExpr Sum2(env);

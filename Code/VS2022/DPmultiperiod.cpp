@@ -115,7 +115,7 @@ int MinSetupMultiPeriod(Cache& cache, const SetupMatrix& Setups, int First, vect
     }
 }
 
-#if 1
+#if 0
 int main()
 {
     int n = 4;

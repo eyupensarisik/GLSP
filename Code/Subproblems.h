@@ -4,6 +4,7 @@
 
 #include "Common.h"
 #include "DataPrep.h"
+#include "ilcp/cp.h"
 #include <unordered_map>
 #include <list>
 
@@ -25,6 +26,18 @@ struct Subproblems
 
 	IloNumVarArray C;
 	BoolVarArray2 e;
+	BoolVarArray2 z;
+
+	Matrix SP_setup;
+	Matrix e_val;
+
+	IloEnv CPenv;
+	IloModel CPmodel;
+	IloObjective CPobj;
+	IloCP CPcplex;
+
+	IloExprArray nexts;
+	IloIntervalSequenceVar V;
 
 	ProductPeriods& PP;
 	ParameterMap& Parameters;
@@ -33,18 +46,23 @@ struct Subproblems
 
 	int IntegerSolutionLimit = INT_MAX;
 
-	Matrix SP_setup;
-
-	Matrix e_val;
+	
 
 	Subproblems(ProductPeriods& PPIn, ParameterMap& PM);
 	~Subproblems();
 
 	void SetupBSPModel(int W, vector<int> wp, vector<int> wt, vector<int> wop, vector<int> wot);
-	bool BSP_Solve();
+	bool BSP_Solve(double timeLimit);
 	double GetBSP_CPUTime() { return CPU; }
 	double GetBSP_LB();
 	double GetBSP_UB();
 	Matrix GetBSP_Solutions(int W);
+
+	void SetupCPModel(int W, vector<int> wp, vector<int> wt, vector<int> wop, vector<int> wot);
+	bool CP_Solve(double timeLimit);
+	double GetCP_CPUTime() { return CPU; }
+	double GetCP_Obj();
+	double GetCP_Bound();
+	double GetCP_Gap();
 };
 #endif
