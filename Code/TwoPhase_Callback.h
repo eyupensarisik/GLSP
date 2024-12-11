@@ -21,19 +21,27 @@ struct Worker
 	double CPU;
 	double TotalSPtime;
 	double TotalSPcons_time;
+	int iter;
 
 	Worker(TwoPhaseC* pTwoPhaseC);
 
-	virtual bool separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_theta, CacheMP& MPcache, const IloNum thetaVal, const NumArray2& xSol, double& OptimalCost,
-		IloExprArray& cuts) = 0;
+	virtual bool separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_theta, CacheMP& MPcache, const IloNum thetaVal, const IloNumArray thetaVal_t, const NumArray2& xSol, double& OptimalCost,
+		IloExprArray& cuts, const NumArray2& x_star, const NumArray2& q_star,
+		IloExprArray& Relaxcuts) = 0;
+
+	virtual bool separateRelax(ProductPeriods& PP, ParameterMap& Parameters, double& OptimalCost, const NumArray2& x_star, const NumArray2& q_star,
+		IloExprArray& Relaxcuts) = 0;
 };
 
 struct WorkerWW : public Worker
 {
 	WorkerWW(TwoPhaseC* pTwoPhaseC);
 
-	bool separate(ProductPeriods& PP, ParameterMap& Parameters,  int& LB_theta, CacheMP& MPcache, const IloNum thetaVal, const NumArray2& xSol, double& OptimalCost,
-		 IloExprArray& cuts);
+	bool separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_theta, CacheMP& MPcache, const IloNum thetaVal, const IloNumArray thetaVal_t, const NumArray2& xSol, double& OptimalCost,
+		IloExprArray& cuts, const NumArray2& x_star, const NumArray2& q_star,
+		IloExprArray& Relaxcuts);
+	bool separateRelax(ProductPeriods& PP, ParameterMap& Parameters, double& OptimalCost, const NumArray2& x_star, const NumArray2& q_star,
+		IloExprArray& Relaxcuts);
 };
 
 struct TwoPhaseCallback : public IloCplex::Callback::Function

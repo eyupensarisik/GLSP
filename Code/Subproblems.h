@@ -58,7 +58,7 @@ struct Subproblems
 	double GetBSP_UB();
 	Matrix GetBSP_Solutions(int W);
 
-	void SetupCPModel(int W, vector<int> wp, vector<int> wt, vector<int> wop, vector<int> wot);
+	void SetupCPModel(int W, vector<int> wp, vector<int> wt, vector<int> wop, vector<int> wot, Matrix x_val);
 	bool CP_Solve(double timeLimit);
 	double GetCP_CPUTime() { return CPU; }
 	double GetCP_Obj();

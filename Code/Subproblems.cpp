@@ -114,11 +114,12 @@ void Subproblems::SetupBSPModel(int W, vector<int> wp, vector<int> wt, vector<in
 	for (int j = 0; j < W + 1; ++j) {
 		SPmodel.add(C[j] <= SP_b[j]);
 	}
-
+	
 	// Constraint (6)
 	for (int j = 0; j < W + 1; ++j) {
 		SPmodel.add(C[j] >= SP_a[j] + SP_r[j]);
 	}
+
 }
 
 bool Subproblems::BSP_Solve(double timeLimit)
@@ -130,7 +131,7 @@ bool Subproblems::BSP_Solve(double timeLimit)
 
 	try
 	{
-		//SPcplex.exportModel("BSP.lp");
+		SPcplex.exportModel("BSP.lp");
 		Solved = SPcplex.solve();
 	}
 	catch (IloException& ex)
@@ -165,7 +166,7 @@ Matrix Subproblems::GetBSP_Solutions(int W)
 	return e_val;
 }
 
-void Subproblems::SetupCPModel(int W, vector<int> wp, vector<int> wt, vector<int> wop, vector<int> wot)
+void Subproblems::SetupCPModel(int W, vector<int> wp, vector<int> wt, vector<int> wop, vector<int> wot, Matrix x_val)
 {
 	// Setup Constraint Programming Subroblem (CP)
 
@@ -175,9 +176,11 @@ void Subproblems::SetupCPModel(int W, vector<int> wp, vector<int> wt, vector<int
 	vector<int> rd;
 	rd.resize(PP.T);
 	int d_sum = 0;
-	for (int t = 0; t < PP.T; ++t) {
+	for (int t = 0; t < PP.T; ++t){
 		rd[t] = d_sum;
-		d_sum += PP.K[t];
+		for (int p = 0; p < PP.P; ++p) {
+			d_sum += x_val[p][t];
+		}
 		dd[t] = d_sum;
 	}
 

@@ -178,6 +178,27 @@ void TwoPhase::SetupModel(double timeLimit)
 		}
 	}
 
+	vector<int> set_min_p;
+	set_min_p.resize(PP.P);
+
+	for (int p = 0; p < PP.P; ++p) {
+		int set_mins = INT_MAX;
+		int set_min = INT_MAX;
+		for (int r = 0; r < PP.P; ++r) {
+			if (p != r)
+				set_mins = PP.Products[r].s_pr[p];
+
+			if (set_mins < set_min)
+				set_min = set_mins;
+		}
+		set_min_p[p] = set_min;
+	}
+
+	//Valid Inequality (3)
+	for (int t = 0; t < PP.T - 1; ++t)
+		for (int p = 0; p < PP.P; ++p)
+			model.add(theta_t[t + 1] >= set_min_p[p] * (x[p][t + 1] - x[p][t]));
+
 	SPtimelimit = timeLimit;
 
 	cplex = IloCplex(model);
@@ -381,7 +402,7 @@ bool TwoPhase::Solve(double timeLimit, double* TwoPhase_Iter, double* TwoPhase_C
 
 					Subproblems CP(PP, Parameters);
 
-					CP.SetupCPModel(W, wp, wt, wop, wot);
+					CP.SetupCPModel(W, wp, wt, wop, wot, x_val);
 
 					auto finishSP_cons = chrono::high_resolution_clock::now();
 					auto SPcons_time = chrono::duration_cast<chrono::milliseconds>(finishSP_cons - startSP_cons);
@@ -567,13 +588,44 @@ bool TwoPhase::Solve(double timeLimit, double* TwoPhase_Iter, double* TwoPhase_C
 					OptCut = Sum1 - Sum2;
 					cout << OptCut << endl;
 
-					for (int t = 0; t < PP.T; ++t) {
-						IloExpr DPCut(env);
-						for (int p = 0; p < PP.P; ++p) {
-							if (x_val[p][t] >= 0.5) 
-								DPCut += (LBsetup[t]) * (1 - x[p][t]);
+					vector<double> theta_tVal;
+					theta_tVal.resize(PP.T);
+					for (int t = 0; t < PP.T; ++t)
+						theta_tVal[t] = cplex.getValue(theta_t[t]);
+
+					IloExprArray DPCut(env, PP.T);
+					for (int t = 0; t < PP.T; ++t)
+						DPCut[t] = IloExpr(env);
+
+					if (iter == 1){
+						for (int t = 0; t < PP.T; ++t) {
+							int DPvall = 0;
+							vector<int> DPval;
+							DPval.resize(PP.T);
+							for (int p = 0; p < PP.P; ++p) {
+								if (x_val[p][t] >= 0.5) {
+									DPvall += (LBsetup[t]) * (1 - x_val[p][t]);
+									DPCut[t] += (LBsetup[t]) * (1 - x[p][t]);
+								}
+							}
+							model.add(theta_t[t] >= LBsetup[t] - DPCut[t]);
 						}
-						model.add(theta_t[t] >= LBsetup[t] - DPCut);
+					}
+					else {
+						for (int t = 0; t < PP.T; ++t) {
+							int DPvall = 0;
+							vector<int> DPval;
+							DPval.resize(PP.T);
+							for (int p = 0; p < PP.P; ++p) {
+								if (x_val[p][t] >= 0.5) {
+									DPvall += (LBsetup[t]) * (1 - x_val[p][t]);
+									DPCut[t] += (LBsetup[t]) * (1 - x[p][t]);
+								}
+							}
+							if (theta_tVal[t] - (LBsetup[t] - DPvall) < -0.001) {
+								model.add(theta_t[t] >= LBsetup[t] - DPCut[t]);
+							}
+						}
 					}
 
 					double LBsetuptotal = 0;
