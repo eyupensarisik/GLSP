@@ -119,7 +119,7 @@ void TwoPhaseC::SetupModel(double timeLimit)
 	for (int t = 0; t < PP.T - 1; ++t)
 		for (int p = 0; p < PP.P; ++p)
 			model.add(q[p][t + 1] >= PP.Products[p].m * (x[p][t + 1] - x[p][t]));
-
+	
 	//Initialization for DP (Fill the Cache)
 	vector<ProductSet> ProductPPs_In;
 
@@ -217,7 +217,7 @@ void TwoPhaseC::SetupModel(double timeLimit)
 		for (int p = 0; p < PP.P; ++p)
 			model.add(theta_t[t + 1] >= set_min_p[p] * (x[p][t + 1] - x[p][t]));
 	}
-
+	
 	SPtimelimit = timeLimit;
 
 	cplex = IloCplex(model);
@@ -237,8 +237,8 @@ bool TwoPhaseC::Solve(double timeLimit)
 	{
 		pCallback = make_unique<TwoPhaseCallback>(this);
 		CPXLONG contextmask = IloCplex::Callback::Context::Id::Candidate
-			| IloCplex::Callback::Context::Id::GlobalProgress
-			| IloCplex::Callback::Context::Id::Relaxation;
+			| IloCplex::Callback::Context::Id::GlobalProgress;
+//			| IloCplex::Callback::Context::Id::Relaxation;
 		cplex.use(pCallback.get(), contextmask);
 
 		cplex.setParam(IloCplex::IntSolLim, IntegerSolutionLimit);
@@ -358,13 +358,14 @@ void TwoPhaseCallback::invoke(const IloCplex::Callback::Context& context)
 
 	IloEnv env = context.getEnv();
 	NumArray2 xVal = CreateNumArray2(env, pTwoPhaseC->PP.P, pTwoPhaseC->PP.T);
+	NumArray2 qVal = CreateNumArray2(env, pTwoPhaseC->PP.P, pTwoPhaseC->PP.T);
 	IloNum thetaVal;
 
 	IloNumArray thetaVal_t = IloNumArray(env, pTwoPhaseC->PP.T);
 
-	NumArray2 x_star = CreateNumArray2(env, pTwoPhaseC->PP.P, pTwoPhaseC->PP.T);
-	NumArray2 q_star = CreateNumArray2(env, pTwoPhaseC->PP.P, pTwoPhaseC->PP.T);
-	IloNum theta_star;
+	//NumArray2 x_star = CreateNumArray2(env, pTwoPhaseC->PP.P, pTwoPhaseC->PP.T);
+	//NumArray2 q_star = CreateNumArray2(env, pTwoPhaseC->PP.P, pTwoPhaseC->PP.T);
+	//IloNum theta_star;
 
 	// Get the current x solution
 	switch (context.getId()) {
@@ -382,10 +383,10 @@ void TwoPhaseCallback::invoke(const IloCplex::Callback::Context& context)
 	case IloCplex::Callback::Context::Id::Relaxation:
 		for (int p = 0; p < pTwoPhaseC->PP.P; ++p)
 			for (int t = 0; t < pTwoPhaseC->PP.T; ++t) {
-				x_star[p][t] = context.getRelaxationPoint(pTwoPhaseC->x[p][t]);
-				q_star[p][t] = context.getRelaxationPoint(pTwoPhaseC->q[p][t]);
+				xVal[p][t] = context.getRelaxationPoint(pTwoPhaseC->x[p][t]);
+				qVal[p][t] = context.getRelaxationPoint(pTwoPhaseC->q[p][t]);
 			}
-		theta_star = context.getRelaxationPoint(pTwoPhaseC->theta);
+		thetaVal = context.getRelaxationPoint(pTwoPhaseC->theta);
 		break;
 	case IloCplex::Callback::Context::Id::GlobalProgress:
 	{
@@ -400,6 +401,7 @@ void TwoPhaseCallback::invoke(const IloCplex::Callback::Context& context)
 	default:
 		// Free memory
 		xVal.end();
+		qVal.end();
 		throw IloCplex::Exception(-1, "Unexpected contextID");
 	}
 
@@ -407,14 +409,10 @@ void TwoPhaseCallback::invoke(const IloCplex::Callback::Context& context)
 	IloExprArray Relaxcuts(env);
 
 	double OptimalCost;
+	double Id = context.getId();
 
-	IloBool sepStat = 0;
-	IloBool sepStatRelax = 0;
-	if (context.getId() == IloCplex::Callback::Context::Id::Candidate)
-		sepStat = worker->separate(pTwoPhaseC->PP, pTwoPhaseC->Parameters, pTwoPhaseC->LB_theta, pTwoPhaseC->MPcache, thetaVal, thetaVal_t, xVal, OptimalCost, cuts, x_star, q_star, Relaxcuts);
-	if (context.getId() == IloCplex::Callback::Context::Id::Relaxation)
-		sepStatRelax = worker->separateRelax(pTwoPhaseC->PP, pTwoPhaseC->Parameters, OptimalCost, x_star, q_star, Relaxcuts);
-
+	IloBool sepStat = worker->separate(pTwoPhaseC->PP, pTwoPhaseC->Parameters, pTwoPhaseC->LB_theta, pTwoPhaseC->MPcache, thetaVal, thetaVal_t, xVal, qVal, OptimalCost, cuts, Id, Relaxcuts);
+	
 	if (context.getId() == IloCplex::Callback::Context::Id::Candidate)
 	{
 		IloNum CandidateObjective = context.getCandidateObjective();
@@ -425,35 +423,30 @@ void TwoPhaseCallback::invoke(const IloCplex::Callback::Context& context)
 	}
 
 	xVal.end();
+	qVal.end();
 	thetaVal_t.end();
-
-	if (sepStatRelax) {
-		IloRangeArray Rr(env, 0, Relaxcuts, IloInfinity);
-
-		switch (context.getId()) {
-		case IloCplex::Callback::Context::Id::Relaxation:
-			for (int t = 0; t < Rr.getSize(); ++t) {
-				cout << Rr[t] << endl;
-				context.addUserCut(Rr[t], IloCplex::UseCutPurge, IloFalse);
-			}
-			break;
-		default:
-			Rr.end();
-			throw IloCplex::Exception(-1, "Unexpected contextID");
-		}
-	}
 
 	if (sepStat) {
 		// Add the cut
 		IloRangeArray r(env, 0, cuts, IloInfinity);
+		IloRangeArray Rr(env, 0, Relaxcuts, IloInfinity);
 		
 		switch (context.getId()) {
 		case IloCplex::Callback::Context::Id::Candidate:
 			context.rejectCandidate(r);
 
 			break;
+		case IloCplex::Callback::Context::Id::Relaxation:
+			if (OptimalCost - thetaVal > 3000) {
+				for (int t = 0; t < Rr.getSize(); ++t) {
+					//cout << Rr[t] << endl;
+					context.addUserCut(Rr[t], IloCplex::UseCutPurge, IloFalse);
+				}
+			}
+			break;
 		default:
 			r.end();
+			Rr.end();
 			throw IloCplex::Exception(-1, "Unexpected contextID");
 		}
 
@@ -484,8 +477,8 @@ Worker::Worker(TwoPhaseC* pB) : pTwoPhaseC(pB)
 WorkerWW::WorkerWW(TwoPhaseC* pB) : Worker(pB)
 {
 }
-
-bool WorkerWW::separateRelax(ProductPeriods& PP, ParameterMap& Parameters, double& OptimalCost, const NumArray2& x_star, const NumArray2& q_star, IloExprArray& Relaxcuts)
+/*
+bool WorkerWW::separateRelax(ProductPeriods& PP, ParameterMap& Parameters, const NumArray2& x_star, const NumArray2& q_star, IloExprArray& Relaxcuts)
 {
 	vector<vector<set<int>>> S;
 	vector<vector<set<int>>> L;
@@ -553,11 +546,11 @@ bool WorkerWW::separateRelax(ProductPeriods& PP, ParameterMap& Parameters, doubl
 			}
 		}
 	}
+
 	return true;
 }
-
-bool WorkerWW::separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_theta, CacheMP& MPcache, const IloNum thetaVal, const IloNumArray thetaVal_t, const NumArray2& xVal, double& OptimalCost, IloExprArray& cuts, const NumArray2& x_star, const NumArray2& q_star,
-	IloExprArray& Relaxcuts)
+*/
+bool WorkerWW::separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_theta, CacheMP& MPcache, const IloNum thetaVal, const IloNumArray thetaVal_t, const NumArray2& xVal, const NumArray2& qVal, double& OptimalCost, IloExprArray& cuts, double& Id, IloExprArray& Relaxcuts)
 {
 	iter += 1;
 
@@ -605,9 +598,10 @@ bool WorkerWW::separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_th
 				wop[k] = p;
 				wot[k] = t;
 			}
+	Subproblems SP(PP, Parameters);
 	if (GetParameterValue(Parameters, "SUBPROBLEM_TYPE") == 0) {
 		auto startSP_cons = chrono::high_resolution_clock::now(); //Start clock for SP
-		Subproblems SP(PP, Parameters);
+
 
 		SP.SetupBSPModel(W, wp, wt, wop, wot);
 		auto finishSP_cons = chrono::high_resolution_clock::now();
@@ -686,7 +680,8 @@ bool WorkerWW::separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_th
 		OptimalCost = CP.GetCP_Obj();
 	}
 
-	double check = 0;
+	if (Id == IloCplex::Callback::Context::Id::Candidate) {
+
 	if (OptimalCost > thetaVal + 0.0001)
 	{
 		cuts.clear();
@@ -789,7 +784,7 @@ bool WorkerWW::separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_th
 			for (int p = 0; p < PP.P; ++p)
 				if (LBsetupPer[p][t] < LBsetupPermin[t])
 					LBsetupPermin[t] = LBsetupPer[p][t];
-
+		//LB = 0;
 		if (LB < LB_theta)
 			LB = LB_theta;
 
@@ -805,9 +800,10 @@ bool WorkerWW::separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_th
 
 		IloExpr cutLhs(pTwoPhaseC->env);
 		cutLhs -= (OptimalCost - LB) * (Sum1)-(OptimalCost - LB) * (W - 1) + LB - pTwoPhaseC->theta;
+		cutLhs -= (OptimalCost - LB) * (Sum1 - Sum2) - (OptimalCost - LB) * (W - 1) + LB - pTwoPhaseC->theta;
 
 
-		
+
 
 		IloExprArray DPCut(pTwoPhaseC->env, pTwoPhaseC->PP.T);
 		for (int t = 0; t < pTwoPhaseC->PP.T; ++t)
@@ -875,13 +871,88 @@ bool WorkerWW::separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_th
 
 		cutGMs -= LBresidual - GMCut - pTwoPhaseC->gamma;
 
-		cuts.add(cutLhs);
 		cuts.add(cutGMs);
-		
+		cuts.add(cutLhs);
+
+
+
+		return true;
+	}
+	}
+
+	if (Id == IloCplex::Callback::Context::Id::Relaxation) {
+		Relaxcuts.clear();
+
+		vector<vector<set<int>>> S;
+		vector<vector<set<int>>> L;
+		S.resize(pTwoPhaseC->PP.P);
+		L.resize(pTwoPhaseC->PP.P);
+		for (int p = 0; p < pTwoPhaseC->PP.P; ++p) {
+			S[p].resize(pTwoPhaseC->PP.T);
+			L[p].resize(pTwoPhaseC->PP.T);
+		}
+
+		for (int p = 0; p < pTwoPhaseC->PP.P; ++p) {
+			for (int l = 0; l < pTwoPhaseC->PP.T; ++l) {
+
+				int alpha = 0;
+				for (int j = 0; j < l + 1; ++j) {
+					int d_pjl = 0;
+					for (int i = j; i < l + 1; ++i)
+						d_pjl += pTwoPhaseC->PP.Products[p].d[i];
+					alpha += IloMin(qVal[p][j], d_pjl * xVal[p][j]);
+				}
+
+				int d_p1l = 0;
+				for (int j = 0; j < l + 1; ++j) {
+					d_p1l += pTwoPhaseC->PP.Products[p].d[j];
+				}
+
+				if (alpha < d_p1l) {
+					for (int j = 0; j < l + 1; ++j) {
+						int d_pjl = 0;
+						for (int i = j; i < l + 1; ++i)
+							d_pjl += pTwoPhaseC->PP.Products[p].d[i];
+						if (qVal[p][j] > d_pjl * xVal[p][j])
+							S[p][l].insert(j);
+
+						L[p][l].insert(j);
+					}
+				}
+			}
+		}
+
+		for (int p = 0; p < pTwoPhaseC->PP.P; ++p) {
+			for (int l = 0; l < pTwoPhaseC->PP.T; ++l) {
+				IloExpr cutRPs(pTwoPhaseC->env);
+				IloExpr qSum(pTwoPhaseC->env);
+				IloExpr dxSum(pTwoPhaseC->env);
+				set<int> difference;
+				set_difference(
+					L[p][l].begin(), L[p][l].end(), S[p][l].begin(), S[p][l].end(),
+					inserter(difference, difference.begin()));
+				for (auto j : difference)
+					qSum += pTwoPhaseC->q[p][j];
+				for (auto j : S[p][l]) {
+					int d_pjl = 0;
+					for (int i = j; i < l + 1; ++i)
+						d_pjl += pTwoPhaseC->PP.Products[p].d[i];
+
+					dxSum += (d_pjl * pTwoPhaseC->x[p][j]);
+				}
+				if (!(difference.empty() && S[p][l].empty())) {
+					int d_p1l = 0;
+					for (int j = 0; j < l + 1; ++j)
+						d_p1l += pTwoPhaseC->PP.Products[p].d[j];
+					cutRPs -= d_p1l - qSum - dxSum;
+					Relaxcuts.add(cutRPs);
+				}
+			}
+		}
 
 		return true;
 	}
 
-	//SP.SPmodel.end();
+	SP.SPmodel.end();
 	return false;
 }

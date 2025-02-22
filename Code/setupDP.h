@@ -22,6 +22,7 @@ public:
 	int MinSetupMultiPeriod(CacheMP& cache, const Matrix& Setups, int First, vector<ProductSet>& Middle, int Last);
 	int MinSetupMiddle(CacheMP& cache, const Matrix& Setups, int First, ProductSet& Middle, int Last);
 	int SetupBetween(const Matrix& Setups, int i, int j);
+	
 };
 #endif
 

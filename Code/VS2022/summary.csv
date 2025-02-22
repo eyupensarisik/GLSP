@@ -1,1 +1,1 @@
-Name,P,T,TwoPhase_Cut,TwoPhase_CPU,TwoPhase_LB,TwoPhase_UB,TwoPhase_Obj,TwoPhase_Gap,TwoPhase_Callback_CPU,TwoPhase_Callback_Cut,SP_Cons_CPU,SP_Solve_CPU,Nconsts,Nvars
+Name,P,T,GLSP_CPU,GLSP_LB,GLSP_UB,GLSP_Gap,Nconsts,Nvars

@@ -30,10 +30,10 @@ int main(int nParams, char* params[])
 	string outputFileName = (nParams > 2 ? params[2] : inputFileNameOnly + "_result.csv");
 	string summaryFileName = (nParams > 3 ? params[3] : "summary.csv");
 
-	string parameterFileName = (nParams > 4 ? params[4] : "../Run/Parameters/TwoPhase_Callback.txt");
+	string parameterFileName = (nParams > 4 ? params[4] : "../Run/Parameters/GLSP_SO.txt");
 
-	int pOverride =  stoi((nParams > 5 ? params[5] : "0"));
-	int tOverride =  stoi((nParams > 6 ? params[6] : "0"));
+	int pOverride = 15;// stoi((nParams > 5 ? params[5] : "0"));
+	int tOverride = 5;//stoi((nParams > 6 ? params[6] : "0"));
 
 	ParameterMap Parameters;
 	ReadParameterMapFromFile(Parameters, parameterFileName);
@@ -51,7 +51,7 @@ int main(int nParams, char* params[])
 		summaryFile.open(summaryFileName.c_str(), ios::trunc);
 		if (!summaryFile)
 			cerr << "Unable to create summary file " << summaryFileName << endl;
-		else if (GetParameterValue(Parameters, "GLSP_Standard") || GetParameterValue(Parameters, "GLSP_NF"))
+		else if (GetParameterValue(Parameters, "GLSP_Standard") || GetParameterValue(Parameters, "GLSP_NF") || GetParameterValue(Parameters, "GLSP_CC") || GetParameterValue(Parameters, "GLSP_TF") || GetParameterValue(Parameters, "GLSP_SO"))
 		{
 			summaryFile << "Name,P,T,GLSP_CPU,GLSP_LB,GLSP_UB,GLSP_Gap,Nconsts,Nvars" << endl;
 		}
@@ -148,6 +148,96 @@ int main(int nParams, char* params[])
 					<< Nvars << endl;
 			}
 		}
+		else if (GetParameterValue(Parameters, "GLSP_CC"))
+		{
+			GLSP glsp(PP, Parameters);
+
+			cout << "Started solving GLSP_CC" << endl;
+			glsp.SetupModel_CC(timeLimit);
+			glsp.Solve(timeLimit);
+			cout << "Finished solving GLSP_CC. UB: " << glsp.GetUB() << " LB: " << glsp.GetLB() << endl;
+
+			double CPUTime_GLSP = glsp.GetCPUTime();
+			double ObjVal = glsp.GetUB();
+			double RelativeGap_GLSP = glsp.GetGap();
+			int Nconsts = glsp.GetConsts();
+			int Nvars = glsp.GetVars();
+			glsp.GetSolutions_CC(PP.P, PP.T, PP.S);
+
+			if (summaryFile)
+			{
+				summaryFile << outputFileName << ","
+					<< PP.P << ","
+					<< PP.T << ","
+					<< CPUTime_GLSP << ","
+					<< glsp.GetLB() << ","
+					<< glsp.GetUB() << ","
+					<< ObjVal << ","
+					<< RelativeGap_GLSP << ","
+					<< Nconsts << ","
+					<< Nvars << endl;
+			}
+		}
+		else if (GetParameterValue(Parameters, "GLSP_TF"))
+		{
+			GLSP glsp(PP, Parameters);
+
+			cout << "Started solving GLSP_TF" << endl;
+			glsp.SetupModel_TF(timeLimit);
+			glsp.Solve(timeLimit);
+			cout << "Finished solving GLSP_TF. UB: " << glsp.GetUB() << " LB: " << glsp.GetLB() << endl;
+
+			double CPUTime_GLSP = glsp.GetCPUTime();
+			double ObjVal = glsp.GetUB();
+			double RelativeGap_GLSP = glsp.GetGap();
+			int Nconsts = glsp.GetConsts();
+			int Nvars = glsp.GetVars();
+			glsp.GetSolutions_TF(PP.P, PP.T, PP.S);
+
+			if (summaryFile)
+			{
+				summaryFile << outputFileName << ","
+					<< PP.P << ","
+					<< PP.T << ","
+					<< CPUTime_GLSP << ","
+					<< glsp.GetLB() << ","
+					<< glsp.GetUB() << ","
+					<< ObjVal << ","
+					<< RelativeGap_GLSP << ","
+					<< Nconsts << ","
+					<< Nvars << endl;
+			}
+		}
+		else if (GetParameterValue(Parameters, "GLSP_SO"))
+		{
+			GLSP glsp(PP, Parameters);
+
+			cout << "Started solving GLSP_SO" << endl;
+			glsp.SetupModel_SO(timeLimit);
+			glsp.Solve(timeLimit);
+			cout << "Finished solving GLSP_SO. UB: " << glsp.GetUB() << " LB: " << glsp.GetLB() << endl;
+
+			double CPUTime_GLSP = glsp.GetCPUTime();
+			double ObjVal = glsp.GetUB();
+			double RelativeGap_GLSP = glsp.GetGap();
+			int Nconsts = glsp.GetConsts();
+			int Nvars = glsp.GetVars();
+			glsp.GetSolutions_SO(PP.P, PP.T, PP.S);
+
+			if (summaryFile)
+			{
+				summaryFile << outputFileName << ","
+					<< PP.P << ","
+					<< PP.T << ","
+					<< CPUTime_GLSP << ","
+					<< glsp.GetLB() << ","
+					<< glsp.GetUB() << ","
+					<< ObjVal << ","
+					<< RelativeGap_GLSP << ","
+					<< Nconsts << ","
+					<< Nvars << endl;
+			}
+			}
 		else if (GetParameterValue(Parameters, "TWO_PHASE")){
 			TwoPhase tp(PP, Parameters);
 

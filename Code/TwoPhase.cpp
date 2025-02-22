@@ -104,7 +104,7 @@ void TwoPhase::SetupModel(double timeLimit)
 	for (int t = 0; t < PP.T; ++t)
 		for (int p = 0; p < PP.P; ++p)
 			model.add(q[p][t] * PP.Products[p].a <= PP.K[t] * x[p][t]);
-
+	/*
 	vector<ProductSet> ProductPPs_In;
 
 	for (int t = 0; t < PP.T; ++t) {
@@ -170,7 +170,6 @@ void TwoPhase::SetupModel(double timeLimit)
 					CapVal += x[p][j];
 					d_pkt += PP.Products[p].a * PP.Products[p].d[j];
 				}
-				//model.add(I[p][t - 1] + TotalCap * CapVal >= d_pkt);
 				eta = ceil(d_pkt / TotalCap);
 				alpha = d_pkt - TotalCap * (eta - 1);
 				model.add(I[p][t - 1] >= alpha * (eta - CapVal));
@@ -198,7 +197,7 @@ void TwoPhase::SetupModel(double timeLimit)
 	for (int t = 0; t < PP.T - 1; ++t)
 		for (int p = 0; p < PP.P; ++p)
 			model.add(theta_t[t + 1] >= set_min_p[p] * (x[p][t + 1] - x[p][t]));
-
+	*/
 	SPtimelimit = timeLimit;
 
 	cplex = IloCplex(model);
