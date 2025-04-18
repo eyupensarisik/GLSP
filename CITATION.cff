@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: "Işık"
+  given-names: "Eyüp Ensar"
+  orcid: "https://orcid.org/0000-0002-9180-0243"
+- family-names: "Taşkın"
+  given-names: "Z. Caner"
+  orcid: "https://orcid.org/0000-0002-9904-4315"
+- family-names: "Ağralı"
+  given-names: "Semra"
+  orcid: "https://orcid.org/0000-0002-5735-3275"
+title: "Github repository for 'A Novel Decomposition-Based Exact Solution Approach for Lot-sizing and Scheduling Problem' "
+version: 1.0.0
+doi: 10.5281/zenodo.1234
+date-released: 2025-04-17
+url: "https://github.com/eyupensarisik/GLSP"
