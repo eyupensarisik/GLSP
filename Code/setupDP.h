@@ -22,7 +22,8 @@ public:
 	int MinSetupMultiPeriod(CacheMP& cache, const Matrix& Setups, int First, vector<ProductSet>& Middle, int Last);
 	int MinSetupMiddle(CacheMP& cache, const Matrix& Setups, int First, ProductSet& Middle, int Last);
 	int SetupBetween(const Matrix& Setups, int i, int j);
-	
+	void generateCombinations(const vector<int>& nums, set<int>& current, int index, vector<set<int>>& all);
+
 };
 #endif
 

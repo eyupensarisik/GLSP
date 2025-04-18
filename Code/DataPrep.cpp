@@ -68,8 +68,6 @@ void ProductPeriods::Resize(int NewP, int NewT)
 
 void ProductPeriods::ReadData(ifstream& file, int& SetupCostLevel)
 {
-	const int MAX_LINE_LENGTH = 1000;
-	char DummyLine[MAX_LINE_LENGTH];
 	string DummyToken;
 	char digit;
 	vector<int> digits;	
@@ -141,36 +139,6 @@ void ProductPeriods::ReadData(ifstream& file, int& SetupCostLevel)
 		}
 	}
 
-	/*
-	cout << "Value of DummyToken is " << DummyToken << endl;
-	cout << "Value of digit is " << digit << endl;
-
-	cout << "Value of P is " << P << endl;
-	cout << "Value of T is " << T << endl;
-	cout << "Value of S is " << S << endl;
-
-	for (int p = 0; p < P; ++p)
-		cout << "Value of h[" << p << "] is " << Products[p].h << endl;
-	for (int p = 0; p < P; ++p)
-		cout << "Value of a[" << p << "] is " << Products[p].a << endl;
-	for (int p = 0; p < P; ++p)
-		for (int t = 0; t < T; ++t)
-			cout << "Value of d[" << p << "][" << t << "] is " << Products[p].d[t] << endl;
-	for (int p = 0; p < P; ++p)
-		for (int r = 0; r < P; ++r)
-			cout << "Value of s_pr[" << p << "][" << r << "] is " << Products[p].s_pr[r] << endl;
-	for (int p = 0; p < P; ++p)
-		cout << "Value of m[" << p << "] is " << Products[p].m << endl;
-	for (int t = 0; t < T; ++t) {
-		cout << "Value of S_b[" << t << "] is " << S_b[t] << endl;
-		cout << "Value of S_f[" << t << "] is " << S_f[t] << endl;
-	}
-	for (int t = 0; t < T; ++t)
-		cout << "Value of L[" << t << "] is " << L[t] << endl;
-	
-	for (int t = 0; t < T; ++t)
-		cout << "Value of K[" << t << "] is " << K[t] << endl;
-	*/
 }
 
 string to_string(const IntegerVector& vect)

@@ -161,3 +161,21 @@ int setupDP::MinSetupMultiPeriod(CacheMP& cache, const Matrix& Setups, int First
         return MinSetup;
     }
 }
+
+void setupDP::generateCombinations(const vector<int>& nums, set<int>& current, int index, vector<set<int>>& all) {
+    // Base case: We've reached the end of the list
+    if (index == nums.size()) {
+        all.emplace_back(current);
+        return;
+    }
+
+    // Exclude the current element
+    generateCombinations(nums, current, index + 1, all);
+
+    // Include the current element
+    current.insert(nums[index]);
+    generateCombinations(nums, current, index + 1, all);
+
+    // Backtrack
+    current.erase(nums[index]);
+}

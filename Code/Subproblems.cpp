@@ -258,7 +258,7 @@ bool Subproblems::CP_Solve(double timeLimit)
 
 	try
 	{
-		//CPcplex.exportModel("CP_GLSP.cpo");
+		CPcplex.exportModel("CP_GLSP.cpo");
 		Solved = CPcplex.solve();
 	}
 	catch (IloException& ex)

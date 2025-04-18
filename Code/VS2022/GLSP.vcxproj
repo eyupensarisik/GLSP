@@ -25,7 +25,6 @@
     <ClCompile Include="..\main.cpp" />
     <ClCompile Include="..\setupDP.cpp" />
     <ClCompile Include="..\Subproblems.cpp" />
-    <ClCompile Include="..\TwoPhase.cpp" />
     <ClCompile Include="..\TwoPhase_Callback.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -34,7 +33,6 @@
     <ClInclude Include="..\GLSP_gen.h" />
     <ClInclude Include="..\setupDP.h" />
     <ClInclude Include="..\Subproblems.h" />
-    <ClInclude Include="..\TwoPhase.h" />
     <ClInclude Include="..\TwoPhase_Callback.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

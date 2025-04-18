@@ -27,9 +27,6 @@ struct Worker
 
 	virtual bool separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_theta, CacheMP& MPcache, const IloNum thetaVal, const IloNumArray thetaVal_t, const NumArray2& xSol, const NumArray2& qSol, double& OptimalCost,
 		IloExprArray& cuts, double& Id, IloExprArray& Relaxcuts) = 0;
-
-	//virtual bool separateRelax(ProductPeriods& PP, ParameterMap& Parameters, const NumArray2& x_star, const NumArray2& q_star,
-		//IloExprArray& Relaxcuts) = 0;
 };
 
 struct WorkerWW : public Worker
@@ -38,8 +35,6 @@ struct WorkerWW : public Worker
 
 	bool separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_theta, CacheMP& MPcache, const IloNum thetaVal, const IloNumArray thetaVal_t, const NumArray2& xSol, const NumArray2& qSol, double& OptimalCost,
 		IloExprArray& cuts, double& Id, IloExprArray& Relaxcuts);
-	//bool separateRelax(ProductPeriods& PP, ParameterMap& Parameters, const NumArray2& x_star, const NumArray2& q_star,
-		//IloExprArray& Relaxcuts);
 };
 
 struct TwoPhaseCallback : public IloCplex::Callback::Function
@@ -61,7 +56,6 @@ struct TwoPhaseC
 	unique_ptr<TwoPhaseCallback> pCallback;
 	double BestBoundThreshold;
 
-	const double Epsilon = 0.001;
 	double CPU = 0;
 
 	IloEnv env;
@@ -87,6 +81,7 @@ struct TwoPhaseC
 	int LB_theta;
 	double W_SPtime = 0;
 	double W_SPcons_time = 0;
+	int TotalCap = 0;
 
 	setupDP sDP;
 	Matrix setup_pr;
@@ -100,6 +95,7 @@ struct TwoPhaseC
 	~TwoPhaseC();
 
 	void SetupModel(double timeLimit);
+	void AddValidInequalities();
 	void SetIntegerSolutionLimit(int i) { IntegerSolutionLimit = i; }
 	bool Solve(double timeLimit);
 	double GetCPUTime() { return CPU; }

@@ -37,10 +37,8 @@ public:
 	~GLSP();
 
 	void SetupModel_S(double timeLimit);
-	void SetupModel_SO(double timeLimit);
 	void SetupModel_NF(double timeLimit);
 	void SetupModel_CC(double timeLimit);
-	void SetupModel_TF(double timeLimit);
 	bool Solve(double timeLimit);
 	double GetCPUTime() { return CPU; }
 	double GetLB();
@@ -50,7 +48,5 @@ public:
 	int GetVars();
 	void GetSolutions(int SolP, int SolT, int S);
 	void GetSolutions_CC(int SolP, int SolT, int S);
-	void GetSolutions_TF(int SolP, int SolT, int S);
-	void GetSolutions_SO(int SolP, int SolT, int S);
 };
 #endif
