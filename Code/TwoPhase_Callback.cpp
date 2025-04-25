@@ -111,9 +111,9 @@ void TwoPhaseC::SetupModel(double timeLimit)
 			model.add(q[p][t] * PP.Products[p].a <= PP.K[t] * x[p][t]);
 
 	//Min Order Quantity Constraint
-	for (int t = 0; t < PP.T - 1; ++t)
+	for (int t = 0; t < PP.T; ++t)
 		for (int p = 0; p < PP.P; ++p)
-			model.add(q[p][t + 1] >= PP.Products[p].m * (x[p][t + 1] - x[p][t]));
+			model.add(q[p][t] >= PP.Products[p].m * x[p][t]);
 	
 	//Initialization for DP (Fill the Cache)
 	vector<ProductSet> ProductPPs_In;
