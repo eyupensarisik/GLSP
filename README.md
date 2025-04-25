@@ -18,3 +18,6 @@ This repository contains the source code, data files and parameters for the pape
 * Navigate to Code\Run on command line
 * Run singlemachineStd.bat, singlemachineNF.bat, singlemachineCC.bat, singlemachineDA.bat to run computational experiments reported in the paper. 
 * Outputs will be generated in Code\VS2022\Results folder. 
+
+# References
+* James RJ and Almada-Lobo B. Single and parallel machine capacitated lotsizing and scheduling: New iterative MIP-based neighborhood search heuristics. Computers & Operations Research 2011;38:1816–25.
