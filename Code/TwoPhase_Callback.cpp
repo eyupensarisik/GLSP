@@ -109,12 +109,19 @@ void TwoPhaseC::SetupModel(double timeLimit)
 	for (int t = 0; t < PP.T; ++t)
 		for (int p = 0; p < PP.P; ++p)
 			model.add(q[p][t] * PP.Products[p].a <= PP.K[t] * x[p][t]);
-
+	
 	//Min Order Quantity Constraint
 	for (int t = 0; t < PP.T; ++t)
 		for (int p = 0; p < PP.P; ++p)
 			model.add(q[p][t] >= PP.Products[p].m * x[p][t]);
 	
+	
+	IloExpr thetaCut(env);
+	for (int t = 0; t < PP.T; ++t)
+		thetaCut += theta_t[t];
+
+	model.add(theta >= thetaCut + gamma);
+
 	//Initialization for DP (Fill the Cache)
 	vector<ProductSet> ProductPPs_In;
 
@@ -136,7 +143,8 @@ void TwoPhaseC::SetupModel(double timeLimit)
 
 	cout << "Finding minimum setup multiperiod" << endl;
 	cout << "Done. Minimum setup: " << sDP.MinSetupMultiPeriod(MPcache, setup_pr, -1, ProductPPs_In, -1) << endl;
-
+	
+	
 	//Set the Global Lower Bound Value
 	if (!ProductPPs_In[0].empty())
 		LB_theta = sDP.MinSetupMiddle(MPcache, setup_pr, -1, ProductPPs_In[0], -1);
@@ -171,13 +179,7 @@ void TwoPhaseC::AddValidInequalities()
 
 			model.add(ValIn >= ValIn_setup);
 		}
-
-		IloExpr thetaCut(env);
-		for (int t = 0; t < PP.T; ++t)
-			thetaCut += theta_t[t];
-
-		model.add(theta >= thetaCut + gamma);
-
+		
 		//Valid Inequality (1) : General
 		for (int t = 1; t < PP.T; ++t)
 			for (int p = 0; p < PP.P; ++p)
@@ -224,6 +226,7 @@ void TwoPhaseC::AddValidInequalities()
 			for (int p = 0; p < PP.P; ++p)
 				model.add(theta_t[t + 1] >= set_min_p[p] * (x[p][t + 1] - x[p][t]));
 		}
+		
 	}
 }
 
@@ -247,6 +250,7 @@ bool TwoPhaseC::Solve(double timeLimit)
 
 		cplex.setParam(IloCplex::IntSolLim, IntegerSolutionLimit);
 		cout << "Started solving Master problem" << endl;
+		
 		Solved = cplex.solve();
 	}
 	catch (IloException& ex)
@@ -402,6 +406,7 @@ void TwoPhaseCallback::invoke(const IloCplex::Callback::Context& context)
 		// Free memory
 		xVal.end();
 		qVal.end();
+		thetaVal_t.end();
 		throw IloCplex::Exception(-1, "Unexpected contextID");
 	}
 
@@ -434,7 +439,7 @@ void TwoPhaseCallback::invoke(const IloCplex::Callback::Context& context)
 		switch (context.getId()) {
 		case IloCplex::Callback::Context::Id::Candidate:
 			context.rejectCandidate(r);
-
+			
 			break;
 		case IloCplex::Callback::Context::Id::Relaxation:
 			for (int t = 0; t < Rr.getSize(); ++t) {
@@ -449,8 +454,9 @@ void TwoPhaseCallback::invoke(const IloCplex::Callback::Context& context)
 
 		{
 			std::unique_lock<std::mutex> lock(pTwoPhaseC->Mutex);
-			for (int t = 0; t < r.getSize(); ++t)
+			for (int t = 0; t < r.getSize(); ++t){
 				pTwoPhaseC->GeneratedCuts.push_back(r[t]);
+			}
 		}
 	}
 	++worker->CallCount;
@@ -612,7 +618,7 @@ bool WorkerWW::separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_th
 
 			//Local Lower Bound Calculation
 			int LB = 0;
-
+			/**/
 			vector<int> set_min_p;
 			set_min_p.resize(PP.P);
 
@@ -652,10 +658,10 @@ bool WorkerWW::separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_th
 			}
 
 			LB = *min_element(set_min_total.begin(), set_min_total.end());
-
+			
 			if (LB < LB_theta)
 				LB = LB_theta;
-
+				
 			//Integer L-shaped method
 			IloExpr Sum1(pTwoPhaseC->env);
 			IloExpr Sum2(pTwoPhaseC->env);
@@ -668,6 +674,7 @@ bool WorkerWW::separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_th
 						Sum2 += pTwoPhaseC->x[p][t];
 
 			IloExpr cutLhs(pTwoPhaseC->env);
+			//cutLhs -= (OptimalCost - LB) * (Sum1 - Sum2)-(OptimalCost - LB) * (W - 1) + LB - pTwoPhaseC->theta;
 			cutLhs -= (OptimalCost - LB) * (Sum1)-(OptimalCost - LB) * (W - 1) + LB - pTwoPhaseC->theta;
 
 			//DP-based cuts
@@ -794,7 +801,7 @@ bool WorkerWW::separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_th
 			//Add generated cuts to the MP
 			cuts.add(cutGMs);
 			cuts.add(cutLhs);
-
+			
 			return true;
 		}
 	}
@@ -871,7 +878,6 @@ bool WorkerWW::separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_th
 						d_p1l += pTwoPhaseC->PP.Products[p].d[j];
 					cutRPs -= d_p1l - qSum - dxSum;
 					if (qValSum + xValSum >= d_p1l + 1) {
-						//cout << cutRPs << endl;
 						Relaxcuts.add(cutRPs);
 					}
 				}

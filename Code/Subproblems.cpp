@@ -19,8 +19,8 @@ Subproblems::~Subproblems()
 
 void Subproblems::SetupBSPModel(int W, vector<int> wp, vector<int> wt, vector<int> wop, vector<int> wot)
 {
-	// Setup Batching and Scheduling Subroblem (BSP)
-
+	// Setup Integer Subroblem (IP)
+	SPcplex.setOut(SPenv.getNullStream());
 	//Find due-dates and release dates
 	vector<int> dd;
 	dd.resize(PP.T);
@@ -131,7 +131,7 @@ bool Subproblems::BSP_Solve(double timeLimit)
 
 	try
 	{
-		SPcplex.exportModel("BSP.lp");
+		SPcplex.exportModel("IP.lp");
 		Solved = SPcplex.solve();
 	}
 	catch (IloException& ex)

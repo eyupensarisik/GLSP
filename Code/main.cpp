@@ -6,13 +6,14 @@
 
 typedef vector<vector<double>> Matrix;
 using namespace std::chrono;
-
+ 
 #if 1
 
 int main(int nParams, char* params[])
 {
-	string inputFileName = (nParams > 1 ? params[1] : "../../Data/SingleMachineCapVar2/Data1-15-15-0.8-0.5-100-100-100-2.dat");
+	string inputFileName = (nParams > 1 ? params[1] : "../../Data/SingleMachineCapVar2/Data1-15-15-0.8-0.5-50-100-100-3.dat");
 	string inputFileNameOnly;
+
 
 	auto fileNameBegin = inputFileName.find_last_of("/\\");
 
@@ -50,11 +51,11 @@ int main(int nParams, char* params[])
 		summaryFile.open(summaryFileName.c_str(), ios::trunc);
 		if (!summaryFile)
 			cerr << "Unable to create summary file " << summaryFileName << endl;
-		else if (GetParameterValue(Parameters, "GLSP_Standard") || GetParameterValue(Parameters, "GLSP_NF") || GetParameterValue(Parameters, "GLSP_CC") )
+		else if (GetParameterValue(Parameters, "GLSP_Standard") || GetParameterValue(Parameters, "GLSP_NF") || GetParameterValue(Parameters, "GLSP_CC") || GetParameterValue(Parameters, "GLSP_TF") )
 		{
 			summaryFile << "Name,P,T,GLSP_CPU,GLSP_LB,GLSP_UB,GLSP_Gap,Nconsts,Nvars" << endl;
 		}
-		else if (GetParameterValue(Parameters, "TWO_PHASE_CALLBACK") || GetParameterValue(Parameters, "TWO_PHASE_SO"))
+		else if (GetParameterValue(Parameters, "TWO_PHASE_CALLBACK") )
 		{
 			summaryFile << "Name,P,T,TwoPhase_Cut,TwoPhase_CPU,TwoPhase_LB,TwoPhase_UB,TwoPhase_Obj,TwoPhase_Gap,TwoPhase_Callback_CPU,TwoPhase_Callback_Cut,SP_Cons_CPU,SP_Solve_CPU,Nconsts,Nvars" << endl;
 		}
@@ -158,6 +159,36 @@ int main(int nParams, char* params[])
 			int Nconsts = glsp.GetConsts();
 			int Nvars = glsp.GetVars();
 			glsp.GetSolutions_CC(PP.P, PP.T, PP.S);
+
+			if (summaryFile)
+			{
+				summaryFile << outputFileName << ","
+					<< PP.P << ","
+					<< PP.T << ","
+					<< CPUTime_GLSP << ","
+					<< glsp.GetLB() << ","
+					<< glsp.GetUB() << ","
+					<< ObjVal << ","
+					<< RelativeGap_GLSP << ","
+					<< Nconsts << ","
+					<< Nvars << endl;
+			}
+		}
+		else if (GetParameterValue(Parameters, "GLSP_TF"))
+		{
+			GLSP glsp(PP, Parameters);
+
+			cout << "Started solving GLSP_TF" << endl;
+			glsp.SetupModel_TF(timeLimit);
+			glsp.Solve(timeLimit);
+			cout << "Finished solving GLSP_TF. UB: " << glsp.GetUB() << " LB: " << glsp.GetLB() << endl;
+
+			double CPUTime_GLSP = glsp.GetCPUTime();
+			double ObjVal = glsp.GetUB();
+			double RelativeGap_GLSP = glsp.GetGap();
+			int Nconsts = glsp.GetConsts();
+			int Nvars = glsp.GetVars();
+			glsp.GetSolutions_TF(PP.P, PP.T, PP.S);
 
 			if (summaryFile)
 			{

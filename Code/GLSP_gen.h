@@ -27,7 +27,9 @@ class GLSP
 	BoolVarArray3 zz; //1 if the transition from product p to r occurs at the beginning of micro - period s; 0 otherwise
 	NumVarArray2 yy;
 	NumVarArray2 rr;
+	NumVarArray3 ww;
 	BoolVarArray2 w;
+	NumVarArray3 alpha;
 
 	setupDP seq_DP;
 	CacheMP SOcache;
@@ -39,6 +41,7 @@ public:
 	void SetupModel_S(double timeLimit);
 	void SetupModel_NF(double timeLimit);
 	void SetupModel_CC(double timeLimit);
+	void SetupModel_TF(double timeLimit);
 	bool Solve(double timeLimit);
 	double GetCPUTime() { return CPU; }
 	double GetLB();
@@ -48,5 +51,6 @@ public:
 	int GetVars();
 	void GetSolutions(int SolP, int SolT, int S);
 	void GetSolutions_CC(int SolP, int SolT, int S);
+	void GetSolutions_TF(int SolP, int SolT, int S);
 };
 #endif
