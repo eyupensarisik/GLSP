@@ -46,6 +46,10 @@ struct TwoPhaseCallback : public IloCplex::Callback::Function
 	~TwoPhaseCallback();
 
 	void invoke(const IloCplex::Callback::Context& context);
+
+	double initial_lower_bound = 0; // Stores the lower bound before this round of cuts
+	const double TOLERANCE = 0.002; // 0.2% tolerance
+	double current_lp_obj;
 };
 
 typedef pair<IntegerVector, double> Solution;
@@ -90,6 +94,7 @@ struct TwoPhaseC
 	list<IloConstraint> GeneratedCuts;
 
 	double SPtimelimit;
+	double initial_lower_bound;
 
 	TwoPhaseC(ProductPeriods& PPIn, ParameterMap& PM);
 	~TwoPhaseC();

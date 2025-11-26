@@ -121,33 +121,6 @@ void TwoPhaseC::SetupModel(double timeLimit)
 		thetaCut += theta_t[t];
 
 	model.add(theta >= thetaCut + gamma);
-
-	//Initialization for DP (Fill the Cache)
-	vector<ProductSet> ProductPPs_In;
-
-	for (int t = 0; t < PP.T; ++t) {
-		ProductSet MPcurrent;
-		for (int p = 0; p < PP.P; ++p) {
-			MPcurrent.insert(p);
-		}
-		ProductPPs_In.push_back(MPcurrent);
-	}
-
-	vector<ProductSet> ProductPPsCopy;
-	for (int i = 0; i < ProductPPs_In.size(); ++i)
-	{
-		if (!ProductPPs_In[i].empty())
-			ProductPPsCopy.push_back(ProductPPs_In[i]);
-	}
-	ProductPPs_In = ProductPPsCopy;
-
-	cout << "Finding minimum setup multiperiod" << endl;
-	cout << "Done. Minimum setup: " << sDP.MinSetupMultiPeriod(MPcache, setup_pr, -1, ProductPPs_In, -1) << endl;
-	
-	
-	//Set the Global Lower Bound Value
-	if (!ProductPPs_In[0].empty())
-		LB_theta = sDP.MinSetupMiddle(MPcache, setup_pr, -1, ProductPPs_In[0], -1);
 	
 	SPtimelimit = timeLimit;
 
@@ -162,7 +135,7 @@ void TwoPhaseC::AddValidInequalities()
 		//Global Lower Bound Value
 		model.add(theta >= LB_theta);
 
-		//Global Lower Bound Value for all periods
+		//Valid Inequality: Period-Based Global Lower Bound
 		double ValIn_setup = 0;
 		IloExpr ValIn(env);
 
@@ -180,12 +153,12 @@ void TwoPhaseC::AddValidInequalities()
 			model.add(ValIn >= ValIn_setup);
 		}
 		
-		//Valid Inequality (1) : General
+		//Valid Inequality: General
 		for (int t = 1; t < PP.T; ++t)
 			for (int p = 0; p < PP.P; ++p)
 				model.add(I[p][t - 1] >= PP.Products[p].d[t] * (1 - x[p][t]));
 
-		//Valid Inequality (2) : Capacitated
+		//Valid Inequality: Capacitated
 
 		for (int p = 0; p < PP.P; ++p) {
 			for (int t = 1; t < PP.T; ++t) {
@@ -221,7 +194,7 @@ void TwoPhaseC::AddValidInequalities()
 			set_min_p[p] = set_min;
 		}
 
-		//Valid Inequality (3) : Disaggregate the bounds on estimated setup cost
+		//Valid Inequality: Period-Based Local Lower Bound
 		for (int t = 0; t < PP.T - 1; ++t) {
 			for (int p = 0; p < PP.P; ++p)
 				model.add(theta_t[t + 1] >= set_min_p[p] * (x[p][t + 1] - x[p][t]));
@@ -244,7 +217,7 @@ bool TwoPhaseC::Solve(double timeLimit)
 	{
 		pCallback = make_unique<TwoPhaseCallback>(this);
 		CPXLONG contextmask = IloCplex::Callback::Context::Id::Candidate
-			| IloCplex::Callback::Context::Id::GlobalProgress;
+			| IloCplex::Callback::Context::Id::Relaxation;
 
 		cplex.use(pCallback.get(), contextmask);
 
@@ -391,6 +364,20 @@ void TwoPhaseCallback::invoke(const IloCplex::Callback::Context& context)
 				qVal[p][t] = context.getRelaxationPoint(pTwoPhaseC->q[p][t]);
 			}
 		thetaVal = context.getRelaxationPoint(pTwoPhaseC->theta);
+		current_lp_obj = context.getRelaxationObjective();
+
+		// Check the stopping criterion
+		if (initial_lower_bound > 1e-6) {
+			double percentage_increase = (current_lp_obj - initial_lower_bound) / initial_lower_bound;
+
+			if (percentage_increase < TOLERANCE) {
+
+				return;
+			}
+		}
+
+		initial_lower_bound = current_lp_obj;
+
 		break;
 	case IloCplex::Callback::Context::Id::GlobalProgress:
 	{
@@ -442,8 +429,11 @@ void TwoPhaseCallback::invoke(const IloCplex::Callback::Context& context)
 			
 			break;
 		case IloCplex::Callback::Context::Id::Relaxation:
-			for (int t = 0; t < Rr.getSize(); ++t) {
-				context.addUserCut(Rr[t], IloCplex::UseCutPurge, IloFalse);
+			if (OptimalCost - thetaVal > 1)
+			{
+				for (int t = 0; t < Rr.getSize(); ++t) {
+					context.addUserCut(Rr[t], IloCplex::UseCutPurge, IloFalse);
+				}
 			}
 			break;
 		default:
@@ -618,7 +608,7 @@ bool WorkerWW::separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_th
 
 			//Local Lower Bound Calculation
 			int LB = 0;
-			/**/
+			
 			vector<int> set_min_p;
 			set_min_p.resize(PP.P);
 
@@ -676,7 +666,7 @@ bool WorkerWW::separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_th
 			IloExpr cutLhs(pTwoPhaseC->env);
 			//cutLhs -= (OptimalCost - LB) * (Sum1 - Sum2)-(OptimalCost - LB) * (W - 1) + LB - pTwoPhaseC->theta;
 			cutLhs -= (OptimalCost - LB) * (Sum1)-(OptimalCost - LB) * (W - 1) + LB - pTwoPhaseC->theta;
-
+			
 			//DP-based cuts
 			vector<double> LBsetup;
 			LBsetup.resize(PP.T);
@@ -877,7 +867,7 @@ bool WorkerWW::separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_th
 					for (int j = 0; j < l + 1; ++j)
 						d_p1l += pTwoPhaseC->PP.Products[p].d[j];
 					cutRPs -= d_p1l - qSum - dxSum;
-					if (qValSum + xValSum >= d_p1l + 1) {
+					if (qValSum + xValSum - d_p1l >= 20) {
 						Relaxcuts.add(cutRPs);
 					}
 				}
