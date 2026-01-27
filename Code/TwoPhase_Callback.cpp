@@ -159,21 +159,36 @@ void TwoPhaseC::AddValidInequalities()
 				model.add(I[p][t - 1] >= PP.Products[p].d[t] * (1 - x[p][t]));
 
 		//Valid Inequality: Capacitated
-
-		for (int p = 0; p < PP.P; ++p) {
-			for (int t = 1; t < PP.T; ++t) {
-				double eta;
-				double alpha;
-				for (int k = 1; k < t + 1; ++k) {
-					IloExpr CapVal(env);
-					double d_pkt = 0;
-					for (int j = k; j < t + 1; ++j) {
-						CapVal += x[p][j];
-						d_pkt += PP.Products[p].a * PP.Products[p].d[j];
+		for (int p = 0; p < PP.P; p++) {
+			for (int l = 1; l < PP.T; l++) {
+				for (int t = 1; t <= l; t++) {
+		
+					double d_ptl = 0;
+					for (int k = t; k <= l; k++) {
+						d_ptl += PP.Products[p].a * PP.Products[p].d[k];
 					}
-					eta = ceil(d_pkt / TotalCap);
-					alpha = d_pkt - TotalCap * (eta - 1);
-					model.add(I[p][k - 1] >= alpha * (eta - CapVal));
+		
+					// Calculate eta_ptl
+					int eta_ptl = 0;
+					double cumulative_K = 0;
+					while (cumulative_K < d_ptl && (t + eta_ptl - 1) < PP.T) {
+						cumulative_K += PP.K[t + eta_ptl];
+						eta_ptl++;
+					}
+		
+					// Calculate alpha_ptl
+					double sum_K_eta = 0;
+					for (int k = t; k <= l; k++) {
+						sum_K_eta += PP.K[k] * (eta_ptl - 1);
+					}
+					double alpha_ptl = d_ptl - sum_K_eta;
+		
+					IloExpr sumX(env);
+					for (int k = t; k <= l; k++) {
+						sumX += x[p][k];
+					}
+					model.add(I[p][t - 1] >= alpha_ptl * (eta_ptl - sumX));
+					sumX.end();
 				}
 			}
 		}
