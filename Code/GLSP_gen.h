@@ -3,7 +3,6 @@
 
 #include "Common.h"
 #include "DataPrep.h"
-#include "setupDP.h"
 
 class GLSP
 {
@@ -30,9 +29,6 @@ class GLSP
 	NumVarArray3 ww;
 	BoolVarArray2 w;
 	NumVarArray3 alpha;
-
-	setupDP seq_DP;
-	CacheMP SOcache;
 	
 public:
 	GLSP(ProductPeriods& PPIn, ParameterMap& PM);

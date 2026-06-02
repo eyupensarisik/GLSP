@@ -587,7 +587,7 @@ bool WorkerWW::separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_th
 			}
 			ProductPPs = ProductPPsCopy;
 
-			OptimalCost = pTwoPhaseC->sDP.MinSetupMultiPeriod(MPcache, pTwoPhaseC->setup_pr, -1, ProductPPs, -1);
+			OptimalCost = pTwoPhaseC->sDP.MinSetupMultiPeriod(PP, MPcache, pTwoPhaseC->setup_pr, -1, ProductPPs, -1);
 
 			auto finishSP = chrono::high_resolution_clock::now();
 			auto SPtime = chrono::duration_cast<chrono::milliseconds>(finishSP - startSP);
@@ -614,7 +614,49 @@ bool WorkerWW::separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_th
 
 			OptimalCost = CP.GetCP_Obj();
 		}
+		else if (GetParameterValue(Parameters, "SUBPROBLEM_TYPE") == 3) { // Subproblem as TSP
+			auto startSP_cons = chrono::high_resolution_clock::now(); //Start clock for SP
+			Subproblems TSP(PP, Parameters);
 
+			TSP.SetupTSPModel(W, wp, wt, wop, wot);
+			auto finishSP_cons = chrono::high_resolution_clock::now();
+			auto SPcons_time = chrono::duration_cast<chrono::milliseconds>(finishSP_cons - startSP_cons);
+			pTwoPhaseC->W_SPcons_time = SPcons_time.count();
+
+			cout << "Started solving Subproblem" << endl;
+			auto startSP = chrono::high_resolution_clock::now(); //Start clock for SP
+
+			bool resultSP = TSP.TSP_Solve(pTwoPhaseC->SPtimelimit);
+
+			auto finishSP = chrono::high_resolution_clock::now();
+			auto SPtime = chrono::duration_cast<chrono::milliseconds>(finishSP - startSP);
+			pTwoPhaseC->W_SPtime = SPtime.count();
+
+			OptimalCost = TSP.GetTSP_UB();
+			TSP.GetTSP_Solutions(W);
+			TSP.TSPmodel.end();
+		}
+		else if (GetParameterValue(Parameters, "SUBPROBLEM_TYPE") == 4) { // Subproblem as TSP CP
+			//Construct Subproblem
+			auto startSP_cons = chrono::high_resolution_clock::now(); //Start clock for SP
+
+			Subproblems TSP_CP(PP, Parameters);
+
+			TSP_CP.SetupTSP_CPModel(W, wp, wt, wop, wot, x_val);
+
+			auto finishSP_cons = chrono::high_resolution_clock::now();
+			auto SPcons_time = chrono::duration_cast<chrono::milliseconds>(finishSP_cons - startSP_cons);
+			TotalSPcons_time += SPcons_time.count();
+
+			auto startSP = chrono::high_resolution_clock::now(); //Start clock for SP
+			TSP_CP.TSP_CP_Solve(pTwoPhaseC->SPtimelimit);
+
+			auto finishSP = chrono::high_resolution_clock::now();
+			auto SPtime = chrono::duration_cast<chrono::milliseconds>(finishSP - startSP);
+			TotalSPtime += SPtime.count();
+
+			OptimalCost = TSP_CP.GetTSP_CP_Obj();
+		}
 	
 		// Generataion of the cuts
 		if (OptimalCost > thetaVal + 0.0001)

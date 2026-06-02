@@ -11,7 +11,7 @@ using namespace std::chrono;
 
 int main(int nParams, char* params[])
 {
-	string inputFileName = (nParams > 1 ? params[1] : "../../Data/SingleMachineCapVar2/Data1-15-15-0.8-0.5-50-100-100-3.dat");
+	string inputFileName = (nParams > 1 ? params[1] : "../../Data/SingleMachineCapVar2/Data1-15-15-0.6-0.5-50-100-100-4.dat");
 	string inputFileNameOnly;
 
 
@@ -32,8 +32,8 @@ int main(int nParams, char* params[])
 
 	string parameterFileName = (nParams > 4 ? params[4] : "../Run/Parameters/TwoPhase_Callback.txt");
 
-	int pOverride = stoi((nParams > 5 ? params[5] : "0"));
-	int tOverride = stoi((nParams > 6 ? params[6] : "0"));
+	int pOverride = 4;// stoi((nParams > 5 ? params[5] : "0"));
+	int tOverride = 4;// stoi((nParams > 6 ? params[6] : "0"));
 
 	ParameterMap Parameters;
 	ReadParameterMapFromFile(Parameters, parameterFileName);

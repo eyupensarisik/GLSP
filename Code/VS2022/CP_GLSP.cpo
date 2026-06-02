@@ -1,0 +1,179 @@
+// --------------------------------------------------------------------------
+// IBM ILOG CP Optimizer model export file
+// Effective workers: 4
+// --------------------------------------------------------------------------
+
+// ------ Internal data: ----------------------------------------------------
+
+internals {
+  version(22.1.1.0);
+  architecture("x64_windows_msvc14/stat_mda", 64);
+}
+
+// ------ Interval-related variables: ---------------------------------------
+
+"Y@0" = intervalVar(size=1);
+"Y@1" = intervalVar(size=1);
+"Y@2" = intervalVar(size=1);
+"Y@3" = intervalVar(size=1);
+"Y@4" = intervalVar(size=1);
+"Y@5" = intervalVar(size=1);
+"Y@6" = intervalVar(size=1);
+"Y@7" = intervalVar(size=1);
+"Y@8" = intervalVar(size=1);
+"Y@9" = intervalVar(size=1);
+"Y@10" = intervalVar(size=1);
+"Y@11" = intervalVar(size=1);
+"Y@12" = intervalVar(size=1);
+"Y@13" = intervalVar(size=1);
+"Y@14" = intervalVar(size=1);
+"Y@15" = intervalVar(size=1);
+"Y@16" = intervalVar(size=1);
+"Y@17" = intervalVar(size=1);
+"Y@18" = intervalVar(size=1);
+"Y@19" = intervalVar(size=1);
+"Y@20" = intervalVar(size=1);
+"Y@21" = intervalVar(size=1);
+"Y@22" = intervalVar(size=1);
+"Y@23" = intervalVar(size=1);
+"Y@24" = intervalVar(size=1);
+V = sequenceVar(["Y@0", "Y@1", "Y@2", "Y@3", "Y@4", "Y@5", "Y@6", "Y@7", "Y@8", "Y@9", "Y@10", "Y@11", "Y@12", "Y@13", "Y@14", "Y@15", "Y@16", "Y@17", "Y@18", "Y@19", "Y@20", "Y@21", "Y@22", "Y@23", "Y@24"], [0..24]);
+
+// ------ Objective: --------------------------------------------------------
+
+minimize(sum([element([0, 0, 0, 0, 0, 266, 266, 266, 266, 266, 392, 392, 392, 392, 392, 473, 473, 473, 473, 473, 417, 417, 417, 417, 417], typeOfNext(V, "Y@0")), element([0, 0, 0, 0, 0, 266, 266, 266, 266, 266, 392, 392, 392, 392, 392, 473, 473, 473, 473, 473, 417, 417, 417, 417, 417], typeOfNext(V, "Y@1", 1)), element([0, 0, 0, 0, 0, 266, 266, 266, 266, 266, 392, 392, 392, 392, 392, 473, 473, 473, 473, 473, 417, 417, 417, 417, 417], typeOfNext(V, "Y@2", 2)), element([0, 0, 0, 0, 0, 266, 266, 266, 266, 266, 392, 392, 392, 392, 392, 473, 473, 473, 473, 473, 417, 417, 417, 417, 417], typeOfNext(V, "Y@3", 3)), element([0, 0, 0, 0, 0, 266, 266, 266, 266, 266, 392, 392, 392, 392, 392, 473, 473, 473, 473, 473, 417, 417, 417, 417, 417], typeOfNext(V, "Y@4", 4)), element([430, 430, 430, 430, 430, 0, 0, 0, 0, 0, 485, 485, 485, 485, 485, 327, 327, 327, 327, 327, 389, 389, 389, 389, 389], typeOfNext(V, "Y@5", 5)), element([430, 430, 430, 430, 430, 0, 0, 0, 0, 0, 485, 485, 485, 485, 485, 327, 327, 327, 327, 327, 389, 389, 389, 389, 389], typeOfNext(V, "Y@6", 6)), element([430, 430, 430, 430, 430, 0, 0, 0, 0, 0, 485, 485, 485, 485, 485, 327, 327, 327, 327, 327, 389, 389, 389, 389, 389], typeOfNext(V, "Y@7", 7)), element([430, 430, 430, 430, 430, 0, 0, 0, 0, 0, 485, 485, 485, 485, 485, 327, 327, 327, 327, 327, 389, 389, 389, 389, 389], typeOfNext(V, "Y@8", 8)), element([430, 430, 430, 430, 430, 0, 0, 0, 0, 0, 485, 485, 485, 485, 485, 327, 327, 327, 327, 327, 389, 389, 389, 389, 389], typeOfNext(V, "Y@9", 9)), element([493, 493, 493, 493, 493, 357, 357, 357, 357, 357, 0, 0, 0, 0, 0, 253, 253, 253, 253, 253, 368, 368, 368, 368, 368], typeOfNext(V, "Y@10", 10)), element([493, 493, 493, 493, 493, 357, 357, 357, 357, 357, 0, 0, 0, 0, 0, 253, 253, 253, 253, 253, 368, 368, 368, 368, 368], typeOfNext(V, "Y@11", 11)), element([493, 493, 493, 493, 493, 357, 357, 357, 357, 357, 0, 0, 0, 0, 0, 253, 253, 253, 253, 253, 368, 368, 368, 368, 368], typeOfNext(V, "Y@12", 12)), element([493, 493, 493, 493, 493, 357, 357, 357, 357, 357, 0, 0, 0, 0, 0, 253, 253, 253, 253, 253, 368, 368, 368, 368, 368], typeOfNext(V, "Y@13", 13)), element([493, 493, 493, 493, 493, 357, 357, 357, 357, 357, 0, 0, 0, 0, 0, 253, 253, 253, 253, 253, 368, 368, 368, 368, 368], typeOfNext(V, "Y@14", 14)), element([328, 328, 328, 328, 328, 335, 335, 335, 335, 335, 345, 345, 345, 345, 345, 0, 0, 0, 0, 0, 371, 371, 371, 371, 371], typeOfNext(V, "Y@15", 15)), element([328, 328, 328, 328, 328, 335, 335, 335, 335, 335, 345, 345, 345, 345, 345, 0, 0, 0, 0, 0, 371, 371, 371, 371, 371], typeOfNext(V, "Y@16", 16)), element([328, 328, 328, 328, 328, 335, 335, 335, 335, 335, 345, 345, 345, 345, 345, 0, 0, 0, 0, 0, 371, 371, 371, 371, 371], typeOfNext(V, "Y@17", 17)), element([328, 328, 328, 328, 328, 335, 335, 335, 335, 335, 345, 345, 345, 345, 345, 0, 0, 0, 0, 0, 371, 371, 371, 371, 371], typeOfNext(V, "Y@18", 18)), element([328, 328, 328, 328, 328, 335, 335, 335, 335, 335, 345, 345, 345, 345, 345, 0, 0, 0, 0, 0, 371, 371, 371, 371, 371], typeOfNext(V, "Y@19", 19)), element([461, 461, 461, 461, 461, 480, 480, 480, 480, 480, 255, 255, 255, 255, 255, 379, 379, 379, 379, 379, 0, 0, 0, 0, 0], typeOfNext(V, "Y@20", 20)), element([461, 461, 461, 461, 461, 480, 480, 480, 480, 480, 255, 255, 255, 255, 255, 379, 379, 379, 379, 379, 0, 0, 0, 0, 0], typeOfNext(V, "Y@21", 21)), element([461, 461, 461, 461, 461, 480, 480, 480, 480, 480, 255, 255, 255, 255, 255, 379, 379, 379, 379, 379, 0, 0, 0, 0, 0], typeOfNext(V, "Y@22", 22)), element([461, 461, 461, 461, 461, 480, 480, 480, 480, 480, 255, 255, 255, 255, 255, 379, 379, 379, 379, 379, 0, 0, 0, 0, 0], typeOfNext(V, "Y@23", 23)), element([461, 461, 461, 461, 461, 480, 480, 480, 480, 480, 255, 255, 255, 255, 255, 379, 379, 379, 379, 379, 0, 0, 0, 0, 0], typeOfNext(V, "Y@24", 24))]));
+
+// ------ Constraints: ------------------------------------------------------
+
+noOverlap(V);
+endBeforeStart("Y@0", "Y@1");
+endBeforeStart("Y@0", "Y@6");
+endBeforeStart("Y@0", "Y@11");
+endBeforeStart("Y@0", "Y@16");
+endBeforeStart("Y@0", "Y@21");
+endBeforeStart("Y@5", "Y@1");
+endBeforeStart("Y@5", "Y@6");
+endBeforeStart("Y@5", "Y@11");
+endBeforeStart("Y@5", "Y@16");
+endBeforeStart("Y@5", "Y@21");
+endBeforeStart("Y@10", "Y@1");
+endBeforeStart("Y@10", "Y@6");
+endBeforeStart("Y@10", "Y@11");
+endBeforeStart("Y@10", "Y@16");
+endBeforeStart("Y@10", "Y@21");
+endBeforeStart("Y@15", "Y@1");
+endBeforeStart("Y@15", "Y@6");
+endBeforeStart("Y@15", "Y@11");
+endBeforeStart("Y@15", "Y@16");
+endBeforeStart("Y@15", "Y@21");
+endBeforeStart("Y@20", "Y@1");
+endBeforeStart("Y@20", "Y@6");
+endBeforeStart("Y@20", "Y@11");
+endBeforeStart("Y@20", "Y@16");
+endBeforeStart("Y@20", "Y@21");
+endBeforeStart("Y@1", "Y@2");
+endBeforeStart("Y@1", "Y@7");
+endBeforeStart("Y@1", "Y@12");
+endBeforeStart("Y@1", "Y@17");
+endBeforeStart("Y@1", "Y@22");
+endBeforeStart("Y@6", "Y@2");
+endBeforeStart("Y@6", "Y@7");
+endBeforeStart("Y@6", "Y@12");
+endBeforeStart("Y@6", "Y@17");
+endBeforeStart("Y@6", "Y@22");
+endBeforeStart("Y@11", "Y@2");
+endBeforeStart("Y@11", "Y@7");
+endBeforeStart("Y@11", "Y@12");
+endBeforeStart("Y@11", "Y@17");
+endBeforeStart("Y@11", "Y@22");
+endBeforeStart("Y@16", "Y@2");
+endBeforeStart("Y@16", "Y@7");
+endBeforeStart("Y@16", "Y@12");
+endBeforeStart("Y@16", "Y@17");
+endBeforeStart("Y@16", "Y@22");
+endBeforeStart("Y@21", "Y@2");
+endBeforeStart("Y@21", "Y@7");
+endBeforeStart("Y@21", "Y@12");
+endBeforeStart("Y@21", "Y@17");
+endBeforeStart("Y@21", "Y@22");
+endBeforeStart("Y@2", "Y@3");
+endBeforeStart("Y@2", "Y@8");
+endBeforeStart("Y@2", "Y@13");
+endBeforeStart("Y@2", "Y@18");
+endBeforeStart("Y@2", "Y@23");
+endBeforeStart("Y@7", "Y@3");
+endBeforeStart("Y@7", "Y@8");
+endBeforeStart("Y@7", "Y@13");
+endBeforeStart("Y@7", "Y@18");
+endBeforeStart("Y@7", "Y@23");
+endBeforeStart("Y@12", "Y@3");
+endBeforeStart("Y@12", "Y@8");
+endBeforeStart("Y@12", "Y@13");
+endBeforeStart("Y@12", "Y@18");
+endBeforeStart("Y@12", "Y@23");
+endBeforeStart("Y@17", "Y@3");
+endBeforeStart("Y@17", "Y@8");
+endBeforeStart("Y@17", "Y@13");
+endBeforeStart("Y@17", "Y@18");
+endBeforeStart("Y@17", "Y@23");
+endBeforeStart("Y@22", "Y@3");
+endBeforeStart("Y@22", "Y@8");
+endBeforeStart("Y@22", "Y@13");
+endBeforeStart("Y@22", "Y@18");
+endBeforeStart("Y@22", "Y@23");
+endBeforeStart("Y@3", "Y@4");
+endBeforeStart("Y@3", "Y@9");
+endBeforeStart("Y@3", "Y@14");
+endBeforeStart("Y@3", "Y@19");
+endBeforeStart("Y@3", "Y@24");
+endBeforeStart("Y@8", "Y@4");
+endBeforeStart("Y@8", "Y@9");
+endBeforeStart("Y@8", "Y@14");
+endBeforeStart("Y@8", "Y@19");
+endBeforeStart("Y@8", "Y@24");
+endBeforeStart("Y@13", "Y@4");
+endBeforeStart("Y@13", "Y@9");
+endBeforeStart("Y@13", "Y@14");
+endBeforeStart("Y@13", "Y@19");
+endBeforeStart("Y@13", "Y@24");
+endBeforeStart("Y@18", "Y@4");
+endBeforeStart("Y@18", "Y@9");
+endBeforeStart("Y@18", "Y@14");
+endBeforeStart("Y@18", "Y@19");
+endBeforeStart("Y@18", "Y@24");
+endBeforeStart("Y@23", "Y@4");
+endBeforeStart("Y@23", "Y@9");
+endBeforeStart("Y@23", "Y@14");
+endBeforeStart("Y@23", "Y@19");
+endBeforeStart("Y@23", "Y@24");
+endOf("Y@0") <= 25;
+endOf("Y@1") <= 25;
+endOf("Y@2") <= 25;
+endOf("Y@3") <= 25;
+endOf("Y@4") <= 25;
+endOf("Y@5") <= 25;
+endOf("Y@6") <= 25;
+endOf("Y@7") <= 25;
+endOf("Y@8") <= 25;
+endOf("Y@9") <= 25;
+endOf("Y@10") <= 25;
+endOf("Y@11") <= 25;
+endOf("Y@12") <= 25;
+endOf("Y@13") <= 25;
+endOf("Y@14") <= 25;
+endOf("Y@15") <= 25;
+endOf("Y@16") <= 25;
+endOf("Y@17") <= 25;
+endOf("Y@18") <= 25;
+endOf("Y@19") <= 25;
+endOf("Y@20") <= 25;
+endOf("Y@21") <= 25;
+endOf("Y@22") <= 25;
+endOf("Y@23") <= 25;
+endOf("Y@24") <= 25;
+
+parameters {
+  TimeLimit = 1800;
+  Workers = 4;
+}
+

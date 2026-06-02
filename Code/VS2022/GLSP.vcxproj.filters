@@ -1,0 +1,20 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="..\Common.cpp" />
+    <ClCompile Include="..\DataPrep.cpp" />
+    <ClCompile Include="..\GLSP_gen.cpp" />
+    <ClCompile Include="..\main.cpp" />
+    <ClCompile Include="..\setupDP.cpp" />
+    <ClCompile Include="..\Subproblems.cpp" />
+    <ClCompile Include="..\TwoPhase_Callback.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\Common.h" />
+    <ClInclude Include="..\DataPrep.h" />
+    <ClInclude Include="..\GLSP_gen.h" />
+    <ClInclude Include="..\setupDP.h" />
+    <ClInclude Include="..\Subproblems.h" />
+    <ClInclude Include="..\TwoPhase_Callback.h" />
+  </ItemGroup>
+</Project>

@@ -27,14 +27,25 @@ struct Subproblems
 	IloNumVarArray C;
 	BoolVarArray2 e;
 	BoolVarArray2 z;
+	NumVarArray2 eta;
 
 	Matrix SP_setup;
 	Matrix e_val;
+
+	IloEnv TSPenv;
+	IloModel TSPmodel;
+	IloObjective TSPobj;
+	IloCplex TSPcplex;
 
 	IloEnv CPenv;
 	IloModel CPmodel;
 	IloObjective CPobj;
 	IloCP CPcplex;
+
+	IloEnv TSP_CPenv;
+	IloModel TSP_CPmodel;
+	IloObjective TSP_CPobj;
+	IloCP TSP_CPcplex;
 
 	IloExprArray nexts;
 	IloIntervalSequenceVar V;
@@ -58,11 +69,25 @@ struct Subproblems
 	double GetBSP_UB();
 	Matrix GetBSP_Solutions(int W);
 
+	void SetupTSPModel(int W, vector<int> wp, vector<int> wt, vector<int> wop, vector<int> wot);
+	bool TSP_Solve(double timeLimit);
+	double GetTSP_CPUTime() { return CPU; }
+	double GetTSP_LB();
+	double GetTSP_UB();
+	Matrix GetTSP_Solutions(int W);
+
 	void SetupCPModel(int W, vector<int> wp, vector<int> wt, vector<int> wop, vector<int> wot, Matrix x_val);
 	bool CP_Solve(double timeLimit);
 	double GetCP_CPUTime() { return CPU; }
 	double GetCP_Obj();
 	double GetCP_Bound();
 	double GetCP_Gap();
+
+	void SetupTSP_CPModel(int W, vector<int> wp, vector<int> wt, vector<int> wop, vector<int> wot, Matrix x_val);
+	bool TSP_CP_Solve(double timeLimit);
+	double GetTSP_CP_CPUTime() { return CPU; }
+	double GetTSP_CP_Obj();
+	double GetTSP_CP_Bound();
+	double GetTSP_CP_Gap();
 };
 #endif

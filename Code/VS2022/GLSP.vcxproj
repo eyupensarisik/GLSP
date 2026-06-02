@@ -135,8 +135,8 @@
     </Midl>
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>C:\Program Files\IBM\ILOG\CPLEX_Studio2211\cplex\include;C:\Program Files\IBM\ILOG\CPLEX_Studio2211\concert\include;C:\Program Files\IBM\ILOG\CPLEX_Studio2211\cpoptimizer\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;IL_STD;%(PreprocessorDefinitions);_SCL_SECURE_NO_WARNINGS</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>C:\Program Files\IBM\ILOG\CPLEX_Studio2211\cplex\include;C:\Program Files\IBM\ILOG\CPLEX_Studio2211\concert\include;C:\Program Files\IBM\ILOG\CPLEX_Studio2211\cpoptimizer\include;C:\Users\user\ortools\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;IL_STD;%(PreprocessorDefinitions);_SCL_SECURE_NO_WARNINGS;OR_PROTO_DLL</PreprocessorDefinitions>
       <MinimalRebuild>false</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
@@ -147,8 +147,8 @@
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>ilocplex.lib;concert.lib;cplex2211.lib;cp.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>C:\Program Files\IBM\ILOG\CPLEX_Studio2211\cplex\lib\x64_windows_msvc14\stat_mdd;C:\Program Files\IBM\ILOG\CPLEX_Studio2211\concert\lib\x64_windows_msvc14\stat_mdd;C:\Program Files\IBM\ILOG\CPLEX_Studio2211\cpoptimizer\lib\x64_windows_msvc14\stat_mdd;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>ilocplex.lib;concert.lib;cplex2211.lib;cp.lib;ortools.lib;abseil_dll.lib;Clp.lib;ClpSolver.lib;Cbc.lib;CbcSolver.lib;Cgl.lib;absl_decode_rust_punycode.lib;absl_demangle_rust.lib;absl_flags_commandlineflag.lib;absl_flags_commandlineflag_internal.lib;absl_flags_config.lib;absl_flags_internal.lib;absl_flags_marshalling.lib;absl_flags_parse.lib;absl_flags_private_handle_accessor.lib;absl_flags_program_name.lib;absl_flags_reflection.lib;absl_flags_usage.lib;absl_flags_usage_internal.lib;absl_log_flags.lib;absl_poison.lib;absl_utf8_for_code_point.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\Program Files\IBM\ILOG\CPLEX_Studio2211\cplex\lib\x64_windows_msvc14\stat_mdd;C:\Program Files\IBM\ILOG\CPLEX_Studio2211\concert\lib\x64_windows_msvc14\stat_mdd;C:\Program Files\IBM\ILOG\CPLEX_Studio2211\cpoptimizer\lib\x64_windows_msvc14\stat_mdd;C:\Users\user\ortools\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Console</SubSystem>
       <RandomizedBaseAddress>false</RandomizedBaseAddress>
@@ -198,7 +198,7 @@
       <TypeLibraryName>.\..\..\..\examples\x86_.net2005_8.0\stat_mta/blend.tlb</TypeLibraryName>
     </Midl>
     <ClCompile>
-      <AdditionalIncludeDirectories>C:\Program Files\IBM\ILOG\CPLEX_Studio2211\cplex\include;C:\Program Files\IBM\ILOG\CPLEX_Studio2211\cpoptimizer\include;C:\Program Files\IBM\ILOG\CPLEX_Studio2211\concert\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Program Files\IBM\ILOG\CPLEX_Studio2211\cplex\include;C:\Program Files\IBM\ILOG\CPLEX_Studio2211\cpoptimizer\include;C:\Program Files\IBM\ILOG\CPLEX_Studio2211\concert\include;C:\Users\user\ortools\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CRT_SECURE_NO_DEPRECATE;_CONSOLE;IL_STD;%(PreprocessorDefinitions);_SCL_SECURE_NO_WARNINGS</PreprocessorDefinitions>
       <ExceptionHandling>Sync</ExceptionHandling>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
@@ -217,9 +217,9 @@
       <Culture>0x0409</Culture>
     </ResourceCompile>
     <Link>
-      <AdditionalDependencies>ilocplex.lib;concert.lib;cplex2211.lib;cp.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ilocplex.lib;concert.lib;cplex2211.lib;cp.lib;ortools.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <SuppressStartupBanner>true</SuppressStartupBanner>
-      <AdditionalLibraryDirectories>C:\Program Files\IBM\ILOG\CPLEX_Studio2211\cplex\lib\x64_windows_msvc14\stat_mda;C:\Program Files\IBM\ILOG\CPLEX_Studio2211\concert\lib\x64_windows_msvc14\stat_mda;C:\Program Files\IBM\ILOG\CPLEX_Studio2211\cpoptimizer\lib\x64_windows_msvc14\stat_mda;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\Program Files\IBM\ILOG\CPLEX_Studio2211\cplex\lib\x64_windows_msvc14\stat_mda;C:\Program Files\IBM\ILOG\CPLEX_Studio2211\concert\lib\x64_windows_msvc14\stat_mda;C:\Program Files\IBM\ILOG\CPLEX_Studio2211\cpoptimizer\lib\x64_windows_msvc14\stat_mda;C:\Users\user\ortools\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <SubSystem>Console</SubSystem>
       <RandomizedBaseAddress>false</RandomizedBaseAddress>
       <DataExecutionPrevention />
