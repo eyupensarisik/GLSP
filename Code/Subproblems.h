@@ -27,7 +27,6 @@ struct Subproblems
 	IloNumVarArray C;
 	BoolVarArray2 e;
 	BoolVarArray2 z;
-	NumVarArray2 eta;
 
 	Matrix SP_setup;
 	Matrix e_val;

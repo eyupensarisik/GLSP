@@ -16,14 +16,19 @@ class setupDP
 
 	bool Solved = false;
 
-	IloNumVarArray C;
 	BoolVarArray2 e;
-	BoolVarArray2 z;
-	NumVarArray2 eta;
-
-	Matrix e_val;
+	IloNumVarArray u;
 
 	IloEnv TSPenv;
+	IloModel TSPmodel;
+	IloCplex TSPcplex;
+	IloObjective TSPobj;
+	
+	IloRangeArray OutDeg;          // per-node out-degree rows
+	IloRangeArray InDeg;           // per-node in-degree rows
+	IloRangeArray Bal;             // per-node flow-balance rows (out - in)
+	bool ModelBuilt = false;
+	vector<int> PrevActiveNodes;   // nodes activated last call, for cheap reset
 
 public:
 	setupDP();
@@ -35,7 +40,7 @@ public:
 	void generateCombinations(const vector<int>& nums, set<int>& current, int index, vector<set<int>>& all);
 
 	double SetupTSPModel(ProductPeriods& PPs, const Matrix& Setups, int First, ProductSet& Middle, int Last);
-	//double TSP_Solve(double timeLimit);
+	void BuildTSPModel(ProductPeriods& PPs, const Matrix& Setups);
 
 };
 #endif

@@ -4,7 +4,6 @@
 #include <chrono>
 #include <numeric>
 
-
 typedef vector<vector<double>> Matrix;
 
 Subproblems::Subproblems(ProductPeriods& PPIn, ParameterMap& PM) : PP(PPIn), Parameters(PM), SPmodel(SPenv), SPcplex(SPenv), CPmodel(CPenv), CPcplex(CPenv), TSPmodel(TSPenv), TSPcplex(TSPenv), TSP_CPmodel(TSP_CPenv), TSP_CPcplex(TSP_CPenv)
@@ -257,10 +256,9 @@ void Subproblems::SetupTSPModel(int W, vector<int> wp, vector<int> wt, vector<in
 		// 2 <= u_i <= n  (constraint 7)
 		u[j] = IloNumVar(TSPenv, 1.0, (double)(W + 1), ILOFLOAT, name);
 	}
-	/**/
+	
 	e = CreateBoolVarArray2(TSPenv, W + 2, W + 2, "e"); //1 if job j is scheduled just before job l; and, 0 otherwise
-	eta = CreateNumVarArray2(TSPenv, W + 2, W + 2, "eta", 0, IloInfinity);
-
+	
 	IloExpr TSPobj1(TSPenv);
 	for (int j = 1; j < W + 1; ++j)
 		for (int l = 1; l < W + 1; ++l)
@@ -307,47 +305,6 @@ void Subproblems::SetupTSPModel(int W, vector<int> wp, vector<int> wt, vector<in
 		prec.end();
 	}
 	
-	//Single Commodity Flow Formulation
-	/*
-	for (int j = 0; j < W + 2; ++j) {
-		for (int l = 0; l < W + 2; ++l)
-			TSPmodel.add(eta[j][l] <= (W + 1) * e[j][l]);
-	}
-
-	IloExpr cExpr7(TSPenv);
-	for (int l = 1; l < W + 1; ++l) {
-		cExpr7 += eta[0][l];
-	}
-	TSPmodel.add(cExpr7 == (W + 1));
-
-	for (int j = 1; j < W + 1; ++j) {
-		IloExpr cExpr9(TSPenv);
-		IloExpr cExpr10(TSPenv);
-
-		for (int l = 0; l < W + 1; ++l)
-			cExpr9 += eta[l][j];
-		for (int l = 1; l < W + 2; ++l)
-			cExpr10 += eta[j][l];
-
-		TSPmodel.add(cExpr9 - cExpr10 == 1);
-	}
-
-	for (auto& [pi, pj] : P) {
-		int j = pi; // convert to 0-indexed
-		int l = pj;
-		
-		IloExpr cExpr11(TSPenv);
-		IloExpr cExpr12(TSPenv);
-
-		for (int k = 0; k < W + 1; ++k)
-			if (k != j)
-				cExpr11 += eta[k][j];
-		for (int m = 0; m < W + 1; ++m)
-			if (m != l)
-				cExpr12 += eta[m][l];
-
-		TSPmodel.add(cExpr11 - cExpr12 >= 1.0);
-	}*/
 }
 
 bool Subproblems::TSP_Solve(double timeLimit)
@@ -514,17 +471,11 @@ double Subproblems::GetCP_Gap()
 	return Solved ? CPcplex.getObjGap() : 100;
 }
 
-///////////////////////
-
 void Subproblems::SetupTSP_CPModel(int W, vector<int> wp, vector<int> wt, vector<int> wop, vector<int> wot, Matrix x_val)
 {
 	// Setup TSP Constraint Programming Subroblem (CP)
 	vector<pair<int, int>> P;
-	/*
-	for (int j = 1; j < W + 1; ++j)
-		if (wt[j] == 0)
-			P.push_back(make_pair(0, j));
-*/
+	
 	for (int t = 0; t < PP.T - 1; ++t)
 		for (int j = 1; j < W + 1; ++j)
 			if (wt[j] == t)
@@ -532,11 +483,6 @@ void Subproblems::SetupTSP_CPModel(int W, vector<int> wp, vector<int> wt, vector
 					if (wt[l] == t + 1)
 						if (j != l)
 							P.push_back(make_pair(j-1, l-1));
-	/*
-	for (int j = 1; j < W + 1; ++j)
-		if (wt[j] == PP.T - 1)
-			P.push_back(make_pair(j, W + 1));
-	*/
 	//Construct Subproblem
 
 	vector<int> SP_a;
@@ -629,68 +575,3 @@ double Subproblems::GetTSP_CP_Gap()
 {
 	return Solved ? TSP_CPcplex.getObjGap() : 100;
 }
-/*
-void SolveTSPWithPrecedence() {
-	CpModelBuilder cp_model;
-	const int num_nodes = 5;
-
-	// Dummy 5x5 distance matrix
-	std::vector<std::vector<int64_t>> costs(num_nodes, std::vector<int64_t>(num_nodes, 0));
-
-	// FIX 1: Change BoolExpr to BoolVar
-	std::vector<std::vector<BoolVar>> arcs(num_nodes, std::vector<BoolVar>(num_nodes));
-
-	for (int i = 0; i < num_nodes; ++i) {
-		for (int j = 0; j < num_nodes; ++j) {
-			if (i == j) continue;
-			// Create boolean variables tracking if the route goes directly i -> j
-			arcs[i][j] = cp_model.NewBoolVar();
-		}
-	}
-
-	// 2. Define Rank/Sequence Variables
-	std::vector<IntVar> rank;
-	for (int i = 0; i < num_nodes; ++i) {
-		rank.push_back(cp_model.NewIntVar(Domain(0, num_nodes - 1)));
-	}
-
-	// 3. Add Circuit Constraint (Ensures a single Hamiltonian cycle)
-	std::vector<std::vector<BoolVar>> circuit_arcs(num_nodes, std::vector<BoolVar>(num_nodes));
-	// ... logic to populate circuit_arcs and call cp_model.AddCircuit ...
-
-	// 4. PRECEDENCE CONSTRAINT: Node 1 must come before Node 3
-	cp_model.AddLessThan(rank[1], rank[3]);
-
-	// 5. Connect Arcs to Ranks (If node i goes to j, then rank[j] = rank[i] + 1)
-	for (int i = 0; i < num_nodes; ++i) {
-		for (int j = 0; j < num_nodes; ++j) {
-			if (i == j) continue;
-			if (j != 0) {
-				cp_model.AddEquality(rank[j], rank[i] + 1).OnlyEnforceIf(arcs[i][j]);
-			}
-		}
-	}
-
-	// FIX 6: Build the total objective function using LinearExpr::WeightedSum
-	std::vector<BoolVar> flat_arcs;
-	std::vector<int64_t> flat_costs;
-	for (int i = 0; i < num_nodes; ++i) {
-		for (int j = 0; j < num_nodes; ++j) {
-			if (i == j) continue;
-			flat_arcs.push_back(arcs[i][j]);
-			flat_costs.push_back(costs[i][j]);
-		}
-	}
-
-	LinearExpr objective = LinearExpr::WeightedSum(flat_arcs, flat_costs);
-	cp_model.Minimize(objective);
-
-	// Solve
-	const CpSolverResponse response = Solve(cp_model.Build());
-
-
-	if (response.status() == CpSolverStatus::OPTIMAL) {
-		std::cout << "Optimal TSP solution found!" << std::endl;
-	}
-}
-*/

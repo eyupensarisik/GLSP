@@ -32,8 +32,8 @@ int main(int nParams, char* params[])
 
 	string parameterFileName = (nParams > 4 ? params[4] : "../Run/Parameters/TwoPhase_Callback.txt");
 
-	int pOverride = 4;// stoi((nParams > 5 ? params[5] : "0"));
-	int tOverride = 4;// stoi((nParams > 6 ? params[6] : "0"));
+	int pOverride =  stoi((nParams > 5 ? params[5] : "0"));
+	int tOverride =  stoi((nParams > 6 ? params[6] : "0"));
 
 	ParameterMap Parameters;
 	ReadParameterMapFromFile(Parameters, parameterFileName);
