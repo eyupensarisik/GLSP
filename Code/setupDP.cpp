@@ -102,7 +102,7 @@ int setupDP::MinSetupMultiPeriod(ProductPeriods& PPs, CacheMP& cache, const Matr
     else if (Middle.size() == 1){
         //cout << MinSetupMiddle(cache, Setups, First, Middle.front(), Last) << endl;
         //return MinSetupMiddle(cache, Setups, First, Middle.front(), Last);
-		return SetupTSPModel(PPs, Setups, First, Middle.front(), Last);
+		return SetupTSPModel(cache, PPs, Setups, First, Middle.front(), Last);
     }
     else
     {
@@ -189,6 +189,30 @@ void setupDP::generateCombinations(const vector<int>& nums, set<int>& current, i
     current.erase(nums[index]);
 }
 
+// ===========================================================================
+// UNIFIED "build once, modify bounds only" TSP model.
+//
+// One model spans every product in P. Degree rows (out / in / balance) and the
+// full P x P MTZ rows are created ONCE. Each call only flips variable bounds
+// and the [lb,ub] of the degree rows to encode the current subproblem and the
+// role (source / sink / interior) of each node. No constraints are ever added
+// or removed after the one-time build.
+//
+// Key facts that make this correct:
+//   * Inactive nodes have all their e-vars pinned to [0,0], so a row summed
+//     over all of P equals the same row summed over the active set, and an
+//     inactive node contributes nothing to the objective.
+//   * Switching a constraint's SENSE (==1, <=1, >=0, off) is just a change to
+//     an IloRange's lower/upper bound, so all three original cases collapse
+//     into one model driven by bounds.
+//   * MTZ uses a constant big-M = P+1 (RHS = P). With u capped at W = |active|
+//     per call (W <= P), every MTZ row for an inactive or non-edge pair stays
+//     slack, so the rows never need to change between calls. Because Middle is
+//     usually close to P here, W ~ P and the relaxation is essentially as tight
+//     as a per-call M = W would give.
+//   * Assumes `Setups` is constant across calls (it is threaded through by
+//     const reference unchanged).
+// ===========================================================================
 void setupDP::BuildTSPModel(ProductPeriods& PPs, const Matrix& Setups)
 {
     if (ModelBuilt)
@@ -247,7 +271,20 @@ void setupDP::BuildTSPModel(ProductPeriods& PPs, const Matrix& Setups)
     TSPmodel.add(InDeg);
     TSPmodel.add(Bal);
 
-    // Full P x P MTZ rows, built ONCE, constant big-M, never modified again.
+    // Global edge-count row: sum of all e. Off by default; the all-open case
+    // pins it to |Middle| - 1 to force a single Hamiltonian path.
+    {
+        IloExpr total(TSPenv);
+        for (int j = 0; j < P; ++j)
+            for (int l = 0; l < P; ++l)
+                if (j != l)
+                    total += e[j][l];
+        TotalEdges = IloRange(TSPenv, -IloInfinity, total, IloInfinity);
+        TSPmodel.add(TotalEdges);
+        total.end();
+    }
+
+    // Full P x P MTZ rows, built ONCE with constant big-M and never modified.
     for (int j = 0; j < P; ++j)
         for (int l = 0; l < P; ++l)
             if (j != l) {
@@ -260,121 +297,149 @@ void setupDP::BuildTSPModel(ProductPeriods& PPs, const Matrix& Setups)
     // Solver built once; re-solved after each round of bound flips.
     TSPcplex = IloCplex(TSPmodel);
     TSPcplex.setOut(TSPenv.getNullStream());
-    //TSPcplex.setParam(IloCplex::Threads, 1);
+    TSPcplex.setParam(IloCplex::Threads, 4);
 
     ModelBuilt = true;
 }
 
-double setupDP::SetupTSPModel(ProductPeriods& PPs, const Matrix& Setups, int First, ProductSet& Middle, int Last)
+double setupDP::SetupTSPModel(CacheMP& cache, ProductPeriods& PPs, const Matrix& Setups, int First, ProductSet& Middle, int Last)
 {
-    double Min = 0;
+    auto [it, inserted] = cache.try_emplace(CacheKey(First, Middle, Last));
 
-    if (Middle.size() == 1) {
-        int Mid = *Middle.begin();
-        Min = SetupBetween(Setups, First, Mid) + SetupBetween(Setups, Mid, Last);
-        return Min;
-    }
+    if (inserted)
+    {
+        double Min = 0;
 
-    BuildTSPModel(PPs, Setups);   // builds once; no-op on later calls
+        if (Middle.size() == 1) {
+            int Mid = *Middle.begin();
+            Min = SetupBetween(Setups, First, Mid) + SetupBetween(Setups, Mid, Last);
+            it->second = Min;
+            return it->second;
+        }
 
-    // --- Determine case, active node set, and W ---
-    int W;
-    int caseId;                       // 1: open start, 2: open end, 3: both fixed
-    set<int> active = Middle;
-    if (First == -1) {                // open start, fixed end
-        active.insert(Last);
-        W = (int)Middle.size() + 1;
-        caseId = 1;
-    }
-    else if (Last == -1) {            // fixed start, open end
-        active.insert(First);
-        W = (int)Middle.size() + 1;
-        caseId = 2;
-    }
-    else {                            // fixed start and end
-        active.insert(First);
-        active.insert(Last);
-        W = (int)Middle.size() + 2;
-        caseId = 3;
-    }
+        BuildTSPModel(PPs, Setups);   // builds once; no-op on later calls
 
-    // --- Reset everything the PREVIOUS call touched back to inactive/off ---
-    for (int j : PrevActiveNodes) {
-        u[j].setBounds(0.0, 0.0);
-        OutDeg[j].setBounds(-IloInfinity, IloInfinity);
-        InDeg[j].setBounds(-IloInfinity, IloInfinity);
-        Bal[j].setBounds(-IloInfinity, IloInfinity);
-        for (int l : PrevActiveNodes)
-            if (j != l)
-                e[j][l].setBounds(0.0, 0.0);
-    }
+        // --- Determine case, active node set, and W ---
+        int W;
+        int caseId;                       // 1: open start, 2: open end, 3: both fixed, 4: both open
+        set<int> active = Middle;
+        if (First == -1 && Last == -1) {  // both open: free-endpoint Hamiltonian path over Middle
+            W = (int)Middle.size();       // active = Middle only; no extra node
+            caseId = 4;
+        }
+        else if (First == -1) {           // open start, fixed end
+            active.insert(Last);
+            W = (int)Middle.size() + 1;
+            caseId = 1;
+        }
+        else if (Last == -1) {            // fixed start, open end
+            active.insert(First);
+            W = (int)Middle.size() + 1;
+            caseId = 2;
+        }
+        else {                            // fixed start and end (path)
+            active.insert(First);
+            active.insert(Last);
+            W = (int)Middle.size() + 2;
+            caseId = 3;
+        }
 
-    // --- Activate this call's e-vars: every ordered pair within `active` ---
-    for (int j : active)
-        for (int l : active)
-            if (j != l)
-                e[j][l].setBounds(0.0, 1.0);
+        // --- Reset everything the PREVIOUS call touched back to inactive/off ---
+        TotalEdges.setBounds(-IloInfinity, IloInfinity);   // global row: off unless case 4 sets it
+        for (int j : PrevActiveNodes) {
+            u[j].setBounds(0.0, 0.0);
+            OutDeg[j].setBounds(-IloInfinity, IloInfinity);
+            InDeg[j].setBounds(-IloInfinity, IloInfinity);
+            Bal[j].setBounds(-IloInfinity, IloInfinity);
+            for (int l : PrevActiveNodes)
+                if (j != l)
+                    e[j][l].setBounds(0.0, 0.0);
+        }
 
-    // --- Set u bounds and degree-row senses for this call's case ---
-    if (caseId == 1) {
-        // open start: no node anchored at 0; all active in [1, W]
+        // --- Activate this call's e-vars: every ordered pair within `active` ---
         for (int j : active)
-            u[j].setBounds(1.0, (double)W);
+            for (int l : active)
+                if (j != l)
+                    e[j][l].setBounds(0.0, 1.0);
 
-        for (int j : Middle) {
-            OutDeg[j].setBounds(1.0, 1.0);            // exactly one successor
-            InDeg[j].setBounds(-IloInfinity, 1.0);    // at most one predecessor
-            Bal[j].setBounds(0.0, IloInfinity);       // out - in >= 0
+        // --- Set u bounds and degree-row senses for this call's case ---
+        if (caseId == 1) {
+            // open start: no node anchored at 0; all active in [1, W]
+            for (int j : active)
+                u[j].setBounds(1.0, (double)W);
+
+            for (int j : Middle) {
+                OutDeg[j].setBounds(1.0, 1.0);            // exactly one successor
+                InDeg[j].setBounds(-IloInfinity, 1.0);    // at most one predecessor
+                Bal[j].setBounds(0.0, IloInfinity);       // out - in >= 0
+            }
+            OutDeg[Last].setBounds(0.0, 0.0);             // sink: no successor
+            InDeg[Last].setBounds(1.0, 1.0);              // sink: exactly one predecessor
+            // Bal[Last] stays off
         }
-        OutDeg[Last].setBounds(0.0, 0.0);             // sink: no successor
-        InDeg[Last].setBounds(1.0, 1.0);              // sink: exactly one predecessor
-        // Bal[Last] stays off
-    }
-    else if (caseId == 2) {
-        u[First].setBounds(0.0, 0.0);                 // source anchored at 0
-        for (int j : Middle)
-            u[j].setBounds(1.0, (double)W);
+        else if (caseId == 2) {
+            u[First].setBounds(0.0, 0.0);                 // source anchored at 0
+            for (int j : Middle)
+                u[j].setBounds(1.0, (double)W);
 
-        for (int j : Middle) {
-            OutDeg[j].setBounds(-IloInfinity, 1.0);   // at most one successor
-            InDeg[j].setBounds(1.0, 1.0);             // exactly one predecessor
-            Bal[j].setBounds(-IloInfinity, 0.0);      // in - out >= 0  (i.e. out - in <= 0)
+            for (int j : Middle) {
+                OutDeg[j].setBounds(-IloInfinity, 1.0);   // at most one successor
+                InDeg[j].setBounds(1.0, 1.0);             // exactly one predecessor
+                Bal[j].setBounds(-IloInfinity, 0.0);      // in - out >= 0  (i.e. out - in <= 0)
+            }
+            OutDeg[First].setBounds(1.0, 1.0);            // source: exactly one successor
+            InDeg[First].setBounds(0.0, 0.0);             // source: no predecessor
+            // Bal[First] stays off
         }
-        OutDeg[First].setBounds(1.0, 1.0);            // source: exactly one successor
-        InDeg[First].setBounds(0.0, 0.0);             // source: no predecessor
-        // Bal[First] stays off
-    }
-    else {
-        u[First].setBounds(0.0, 0.0);                 // source anchored at 0
-        for (int j : Middle)
-            u[j].setBounds(1.0, (double)W);
-        u[Last].setBounds(1.0, (double)W);
+        else if (caseId == 3) {
+            u[First].setBounds(0.0, 0.0);                 // source anchored at 0
+            for (int j : Middle)
+                u[j].setBounds(1.0, (double)W);
+            u[Last].setBounds(1.0, (double)W);
 
-        for (int j : Middle) {
-            OutDeg[j].setBounds(1.0, 1.0);            // interior: one successor
-            InDeg[j].setBounds(1.0, 1.0);             // interior: one predecessor
+            for (int j : Middle) {
+                OutDeg[j].setBounds(1.0, 1.0);            // interior: one successor
+                InDeg[j].setBounds(1.0, 1.0);             // interior: one predecessor
+            }
+            OutDeg[First].setBounds(1.0, 1.0);            // source: one successor
+            InDeg[Last].setBounds(1.0, 1.0);             // sink: one predecessor
+            // InDeg[First] / OutDeg[Last] stay off; MTZ + the source anchor force
+            // in-degree(First) = 0, and the degree budget forces out-degree(Last)=0.
+            e[First][Last].setBounds(0.0, 0.0);           // no direct First -> Last edge
         }
-        OutDeg[First].setBounds(1.0, 1.0);            // source: one successor
-        InDeg[Last].setBounds(1.0, 1.0);             // sink: one predecessor
-        // InDeg[First] / OutDeg[Last] stay off; MTZ + the source anchor force
-        // in-degree(First) = 0, and the degree budget forces out-degree(Last)=0.
-        e[First][Last].setBounds(0.0, 0.0);           // no direct First -> Last edge
+        else { // caseId == 4 : both ends open (free-endpoint Hamiltonian path over Middle)
+            // No node anchored at 0; the path's start/end are chosen by the solver.
+            for (int j : Middle)
+                u[j].setBounds(1.0, (double)W);
+
+            for (int j : Middle) {
+                OutDeg[j].setBounds(-IloInfinity, 1.0);   // at most one successor
+                InDeg[j].setBounds(-IloInfinity, 1.0);    // at most one predecessor
+                // Bal[j] stays off
+            }
+
+            // Exactly |Middle| - 1 edges. Combined with in/out <= 1 and the MTZ
+            // (acyclicity), this forces a single path covering every node, with
+            // its two endpoints (the in-degree-0 and out-degree-0 nodes) free.
+            TotalEdges.setBounds((double)(W - 1), (double)(W - 1));
+        }
+
+        // Remember the active set so the next call resets exactly these.
+        PrevActiveNodes.assign(active.begin(), active.end());
+
+        try
+        {
+            //TSPcplex.exportModel("TSP.lp");
+            Solved = TSPcplex.solve();
+            Min = Solved ? TSPcplex.getObjValue() : DBL_MAX;
+        }
+        catch (IloException& ex)
+        {
+            cout << ex.getMessage() << endl;
+            Min = DBL_MAX;
+        }
+		it->second = Min;
     }
 
-    // Remember the active set so the next call resets exactly these.
-    PrevActiveNodes.assign(active.begin(), active.end());
-
-    try
-    {
-        //TSPcplex.exportModel("TSP.lp");
-        Solved = TSPcplex.solve();
-        Min = Solved ? TSPcplex.getObjValue() : DBL_MAX;
-    }
-    catch (IloException& ex)
-    {
-        cout << ex.getMessage() << endl;
-        Min = DBL_MAX;
-    }
-
-    return Min;
+    return it->second;
 }

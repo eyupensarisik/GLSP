@@ -32,8 +32,8 @@ int main(int nParams, char* params[])
 
 	string parameterFileName = (nParams > 4 ? params[4] : "../Run/Parameters/TwoPhase_Callback.txt");
 
-	int pOverride =  stoi((nParams > 5 ? params[5] : "0"));
-	int tOverride =  stoi((nParams > 6 ? params[6] : "0"));
+	int pOverride = 5;// stoi((nParams > 5 ? params[5] : "0"));
+	int tOverride = 5;//stoi((nParams > 6 ? params[6] : "0"));
 
 	ParameterMap Parameters;
 	ReadParameterMapFromFile(Parameters, parameterFileName);
@@ -57,7 +57,7 @@ int main(int nParams, char* params[])
 		}
 		else if (GetParameterValue(Parameters, "TWO_PHASE_CALLBACK") )
 		{
-			summaryFile << "Name,P,T,TwoPhase_Cut,TwoPhase_CPU,TwoPhase_LB,TwoPhase_UB,TwoPhase_Obj,TwoPhase_Gap,TwoPhase_Callback_CPU,TwoPhase_Callback_Cut,SP_Cons_CPU,SP_Solve_CPU,Nconsts,Nvars" << endl;
+			summaryFile << "Name,P,T,TwoPhase_Cut,TwoPhase_CPU,TwoPhase_LB,TwoPhase_UB,TwoPhase_Obj,TwoPhase_Gap,TwoPhase_Callback_CPU,TwoPhase_Callback_Call,SP_Cons_CPU,SP_Solve_CPU,Nconsts,Nvars" << endl;
 		}
 	}
 

@@ -1,1 +1,2 @@
-Name,P,T,TwoPhase_Cut,TwoPhase_CPU,TwoPhase_LB,TwoPhase_UB,TwoPhase_Obj,TwoPhase_Gap,TwoPhase_Callback_CPU,TwoPhase_Callback_Cut,SP_Cons_CPU,SP_Solve_CPU,Nconsts,Nvars
+Name,P,T,TwoPhase_Cut,TwoPhase_CPU,TwoPhase_LB,TwoPhase_UB,TwoPhase_Obj,TwoPhase_Gap,TwoPhase_Callback_CPU,TwoPhase_Callback_Call,SP_Cons_CPU,SP_Solve_CPU,Nconsts,Nvars
+Data1-15-15-0.6-0.5-50-100-100-4_result.csv,4,4,318,1.667,3842,3842,3842,0,3.001,323,0,1.062,74,54

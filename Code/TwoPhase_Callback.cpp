@@ -134,7 +134,7 @@ void TwoPhaseC::AddValidInequalities()
 	if (SelectedVIs){
 		//Global Lower Bound Value
 		model.add(theta >= LB_theta);
-
+		
 		//Valid Inequality: Period-Based Global Lower Bound
 		double ValIn_setup = 0;
 		IloExpr ValIn(env);
@@ -146,13 +146,14 @@ void TwoPhaseC::AddValidInequalities()
 					current.insert(p);
 
 			if (!current.empty())
-				ValIn_setup = sDP.MinSetupMiddle(MPcache, setup_pr, -1, current, -1);
+				//ValIn_setup = sDP.MinSetupMiddle(MPcache, setup_pr, -1, current, -1);
+				ValIn_setup = sDP.SetupTSPModel(MPcache, PP, setup_pr, -1, current, -1);
 
 			ValIn += theta_t[t];
 
 			model.add(ValIn >= ValIn_setup);
 		}
-		
+		/*
 		//Valid Inequality: General
 		for (int t = 1; t < PP.T; ++t)
 			for (int p = 0; p < PP.P; ++p)
@@ -192,7 +193,7 @@ void TwoPhaseC::AddValidInequalities()
 				}
 			}
 		}
-
+		*/
 		vector<int> set_min_p;
 		set_min_p.resize(PP.P);
 
@@ -208,7 +209,7 @@ void TwoPhaseC::AddValidInequalities()
 			}
 			set_min_p[p] = set_min;
 		}
-
+		
 		//Valid Inequality: Period-Based Local Lower Bound
 		for (int t = 0; t < PP.T - 1; ++t) {
 			for (int p = 0; p < PP.P; ++p)
@@ -231,8 +232,8 @@ bool TwoPhaseC::Solve(double timeLimit)
 	try
 	{
 		pCallback = make_unique<TwoPhaseCallback>(this);
-		CPXLONG contextmask = IloCplex::Callback::Context::Id::Candidate
-			| IloCplex::Callback::Context::Id::Relaxation;
+		CPXLONG contextmask = IloCplex::Callback::Context::Id::Candidate;
+//			| IloCplex::Callback::Context::Id::Relaxation;
 
 		cplex.use(pCallback.get(), contextmask);
 
@@ -379,11 +380,11 @@ void TwoPhaseCallback::invoke(const IloCplex::Callback::Context& context)
 				qVal[p][t] = context.getRelaxationPoint(pTwoPhaseC->q[p][t]);
 			}
 		thetaVal = context.getRelaxationPoint(pTwoPhaseC->theta);
-		current_lp_obj = context.getRelaxationObjective();
+		worker->current_lp_obj = context.getRelaxationObjective();  
 
 		// Check the stopping criterion
-		if (initial_lower_bound > 1e-6) {
-			double percentage_increase = (current_lp_obj - initial_lower_bound) / initial_lower_bound;
+		if (worker->initial_lower_bound > 1e-6) {
+			double percentage_increase = (worker->current_lp_obj - worker->initial_lower_bound) / worker->initial_lower_bound;
 
 			if (percentage_increase < TOLERANCE) {
 
@@ -391,7 +392,7 @@ void TwoPhaseCallback::invoke(const IloCplex::Callback::Context& context)
 			}
 		}
 
-		initial_lower_bound = current_lp_obj;
+		worker->initial_lower_bound = worker->current_lp_obj;
 
 		break;
 	case IloCplex::Callback::Context::Id::GlobalProgress:
@@ -418,7 +419,7 @@ void TwoPhaseCallback::invoke(const IloCplex::Callback::Context& context)
 	double OptimalCost;
 	double Id = context.getId();
 
-	IloBool sepStat = worker->separate(pTwoPhaseC->PP, pTwoPhaseC->Parameters, pTwoPhaseC->LB_theta, pTwoPhaseC->MPcache, thetaVal, thetaVal_t, xVal, qVal, OptimalCost, cuts, Id, Relaxcuts);
+	IloBool sepStat = worker->separate(pTwoPhaseC->PP, pTwoPhaseC->Parameters, pTwoPhaseC->LB_theta, worker->MPcache, thetaVal, thetaVal_t, xVal, qVal, OptimalCost, cuts, Id, Relaxcuts);
 	
 	if (context.getId() == IloCplex::Callback::Context::Id::Candidate)
 	{
@@ -468,8 +469,8 @@ void TwoPhaseCallback::invoke(const IloCplex::Callback::Context& context)
 	if (sepStat)
 		++worker->CutCount;
 	worker->CPU += chrono::duration_cast<chrono::milliseconds>(chrono::high_resolution_clock::now() - startTime).count() / 1000.0;
-	worker->TotalSPtime += pTwoPhaseC->W_SPtime;
-	worker->TotalSPcons_time += pTwoPhaseC->W_SPcons_time;
+	worker->TotalSPtime += worker->W_SPtime;
+	worker->TotalSPcons_time += worker->W_SPcons_time;
 }
 
 Worker::Worker(TwoPhaseC* pB) : pTwoPhaseC(pB)
@@ -543,7 +544,7 @@ bool WorkerWW::separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_th
 			SP.SetupBSPModel(W, wp, wt, wop, wot);
 			auto finishSP_cons = chrono::high_resolution_clock::now();
 			auto SPcons_time = chrono::duration_cast<chrono::milliseconds>(finishSP_cons - startSP_cons);
-			pTwoPhaseC->W_SPcons_time = SPcons_time.count();
+			W_SPcons_time = SPcons_time.count();
 
 			cout << "Started solving Subproblem" << endl;
 			auto startSP = chrono::high_resolution_clock::now(); //Start clock for SP
@@ -552,7 +553,7 @@ bool WorkerWW::separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_th
 
 			auto finishSP = chrono::high_resolution_clock::now();
 			auto SPtime = chrono::duration_cast<chrono::milliseconds>(finishSP - startSP);
-			pTwoPhaseC->W_SPtime = SPtime.count();
+			W_SPtime = SPtime.count();
 
 			OptimalCost = SP.GetBSP_UB();
 			SP.GetBSP_Solutions(W);
@@ -587,7 +588,7 @@ bool WorkerWW::separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_th
 			}
 			ProductPPs = ProductPPsCopy;
 
-			OptimalCost = pTwoPhaseC->sDP.MinSetupMultiPeriod(PP, MPcache, pTwoPhaseC->setup_pr, -1, ProductPPs, -1);
+			OptimalCost = sDP.MinSetupMultiPeriod(PP, MPcache, pTwoPhaseC->setup_pr, -1, ProductPPs, -1);
 
 			auto finishSP = chrono::high_resolution_clock::now();
 			auto SPtime = chrono::duration_cast<chrono::milliseconds>(finishSP - startSP);
@@ -621,7 +622,7 @@ bool WorkerWW::separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_th
 			TSP.SetupTSPModel(W, wp, wt, wop, wot);
 			auto finishSP_cons = chrono::high_resolution_clock::now();
 			auto SPcons_time = chrono::duration_cast<chrono::milliseconds>(finishSP_cons - startSP_cons);
-			pTwoPhaseC->W_SPcons_time = SPcons_time.count();
+			W_SPcons_time = SPcons_time.count();
 
 			cout << "Started solving Subproblem" << endl;
 			auto startSP = chrono::high_resolution_clock::now(); //Start clock for SP
@@ -630,7 +631,7 @@ bool WorkerWW::separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_th
 
 			auto finishSP = chrono::high_resolution_clock::now();
 			auto SPtime = chrono::duration_cast<chrono::milliseconds>(finishSP - startSP);
-			pTwoPhaseC->W_SPtime = SPtime.count();
+			W_SPtime = SPtime.count();
 
 			OptimalCost = TSP.GetTSP_UB();
 			TSP.GetTSP_Solutions(W);
@@ -743,8 +744,8 @@ bool WorkerWW::separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_th
 				}
 
 				if (!current.empty())
-					LBsetupDP = pTwoPhaseC->sDP.MinSetupMiddle(MPcache, pTwoPhaseC->setup_pr, -1, current, -1);
-				else
+					LBsetupDP = sDP.SetupTSPModel(MPcache, PP, pTwoPhaseC->setup_pr, -1, current, -1);//sDP.MinSetupMiddle(MPcache, pTwoPhaseC->setup_pr, -1, current, -1);
+				else 
 					LBsetupDP = 0;
 
 				LBsetup[t] = LBsetupDP;
@@ -757,7 +758,7 @@ bool WorkerWW::separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_th
 							current.erase(p);
 
 						if (!current.empty())
-							LBsetupDP = pTwoPhaseC->sDP.MinSetupMiddle(MPcache, pTwoPhaseC->setup_pr, -1, current, -1);
+							LBsetupDP = sDP.SetupTSPModel(MPcache, PP, pTwoPhaseC->setup_pr, -1, current, -1);//sDP.MinSetupMiddle(MPcache, pTwoPhaseC->setup_pr, -1, current, -1);
 						else
 							LBsetupDP = 0;
 

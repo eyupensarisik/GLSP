@@ -23,6 +23,14 @@ struct Worker
 	double TotalSPcons_time;
 	int iter;
 
+	setupDP sDP;
+	CacheMP MPcache;
+
+	double W_SPtime = 0;
+	double W_SPcons_time = 0;
+	double current_lp_obj = 0;
+	double initial_lower_bound = 0; // Stores the lower bound before this round of cuts
+
 	Worker(TwoPhaseC* pTwoPhaseC);
 
 	virtual bool separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_theta, CacheMP& MPcache, const IloNum thetaVal, const IloNumArray thetaVal_t, const NumArray2& xSol, const NumArray2& qSol, double& OptimalCost,
@@ -47,9 +55,8 @@ struct TwoPhaseCallback : public IloCplex::Callback::Function
 
 	void invoke(const IloCplex::Callback::Context& context);
 
-	double initial_lower_bound = 0; // Stores the lower bound before this round of cuts
 	const double TOLERANCE = 0.002; // 0.2% tolerance
-	double current_lp_obj;
+
 };
 
 typedef pair<IntegerVector, double> Solution;
@@ -83,8 +90,6 @@ struct TwoPhaseC
 
 	int IntegerSolutionLimit = INT_MAX;
 	int LB_theta;
-	double W_SPtime = 0;
-	double W_SPcons_time = 0;
 	int TotalCap = 0;
 
 	setupDP sDP;
@@ -94,7 +99,7 @@ struct TwoPhaseC
 	list<IloConstraint> GeneratedCuts;
 
 	double SPtimelimit;
-	double initial_lower_bound;
+	//double initial_lower_bound;
 
 	TwoPhaseC(ProductPeriods& PPIn, ParameterMap& PM);
 	~TwoPhaseC();

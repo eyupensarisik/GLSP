@@ -27,6 +27,7 @@ class setupDP
 	IloRangeArray OutDeg;          // per-node out-degree rows
 	IloRangeArray InDeg;           // per-node in-degree rows
 	IloRangeArray Bal;             // per-node flow-balance rows (out - in)
+	IloRange TotalEdges;           // global edge-count row (used by the all-open case)
 	bool ModelBuilt = false;
 	vector<int> PrevActiveNodes;   // nodes activated last call, for cheap reset
 
@@ -39,7 +40,7 @@ public:
 	int SetupBetween(const Matrix& Setups, int i, int j);
 	void generateCombinations(const vector<int>& nums, set<int>& current, int index, vector<set<int>>& all);
 
-	double SetupTSPModel(ProductPeriods& PPs, const Matrix& Setups, int First, ProductSet& Middle, int Last);
+	double SetupTSPModel(CacheMP& cache, ProductPeriods& PPs, const Matrix& Setups, int First, ProductSet& Middle, int Last);
 	void BuildTSPModel(ProductPeriods& PPs, const Matrix& Setups);
 
 };
