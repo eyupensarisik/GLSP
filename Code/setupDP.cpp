@@ -95,14 +95,15 @@ int setupDP::MinSetupMiddle(CacheMP& cache, const Matrix& Setups, int First, Pro
     return it->second;
 }
 
-int setupDP::MinSetupMultiPeriod(ProductPeriods& PPs, CacheMP& cache, const Matrix& Setups, int First, vector<ProductSet>& Middle, int Last)
+int setupDP::MinSetupMultiPeriod(ProductPeriods& PPs, CacheMP& cache, const Matrix& Setups, int First, vector<ProductSet>& Middle, int Last, int control)
 {
     if (Middle.empty())
         return SetupBetween(Setups, First, Last);
     else if (Middle.size() == 1){
-        //cout << MinSetupMiddle(cache, Setups, First, Middle.front(), Last) << endl;
-        //return MinSetupMiddle(cache, Setups, First, Middle.front(), Last);
-		return SetupTSPModel(cache, PPs, Setups, First, Middle.front(), Last);
+        if (control == 0)
+            return MinSetupMiddle(cache, Setups, First, Middle.front(), Last);
+        else if (control == 1)
+    		return SetupTSPModel(cache, PPs, Setups, First, Middle.front(), Last);
     }
     else
     {
@@ -115,13 +116,13 @@ int setupDP::MinSetupMultiPeriod(ProductPeriods& PPs, CacheMP& cache, const Matr
         for (auto i : LeftLastCopy)
         {
             Left.back().erase(i);
-            LeftSetups[i] = MinSetupMultiPeriod(PPs, cache, Setups, First, Left, i);
+            LeftSetups[i] = MinSetupMultiPeriod(PPs, cache, Setups, First, Left, i, control);
             Left.back().insert(i);
         }
         }
         else {
             for (auto i : LeftLastCopy)
-                LeftSetups[i] = MinSetupMultiPeriod(PPs, cache, Setups, First, Left, i);
+                LeftSetups[i] = MinSetupMultiPeriod(PPs, cache, Setups, First, Left, i, control);
         }
 
         vector<ProductSet> Right(Middle.begin() + Split, Middle.end());
@@ -131,13 +132,13 @@ int setupDP::MinSetupMultiPeriod(ProductPeriods& PPs, CacheMP& cache, const Matr
             for (auto i : RightFirstCopy)
             {
                 Right.front().erase(i);
-                RightSetups[i] = MinSetupMultiPeriod(PPs, cache, Setups, i, Right, Last);
+                RightSetups[i] = MinSetupMultiPeriod(PPs, cache, Setups, i, Right, Last, control);
                 Right.front().insert(i);
             }
         }
         else {
             for (auto i : RightFirstCopy)
-                RightSetups[i] = MinSetupMultiPeriod(PPs, cache, Setups, i, Right, Last);
+                RightSetups[i] = MinSetupMultiPeriod(PPs, cache, Setups, i, Right, Last, control);
         }
 
         int MinSetup = INT_MAX;
@@ -189,30 +190,6 @@ void setupDP::generateCombinations(const vector<int>& nums, set<int>& current, i
     current.erase(nums[index]);
 }
 
-// ===========================================================================
-// UNIFIED "build once, modify bounds only" TSP model.
-//
-// One model spans every product in P. Degree rows (out / in / balance) and the
-// full P x P MTZ rows are created ONCE. Each call only flips variable bounds
-// and the [lb,ub] of the degree rows to encode the current subproblem and the
-// role (source / sink / interior) of each node. No constraints are ever added
-// or removed after the one-time build.
-//
-// Key facts that make this correct:
-//   * Inactive nodes have all their e-vars pinned to [0,0], so a row summed
-//     over all of P equals the same row summed over the active set, and an
-//     inactive node contributes nothing to the objective.
-//   * Switching a constraint's SENSE (==1, <=1, >=0, off) is just a change to
-//     an IloRange's lower/upper bound, so all three original cases collapse
-//     into one model driven by bounds.
-//   * MTZ uses a constant big-M = P+1 (RHS = P). With u capped at W = |active|
-//     per call (W <= P), every MTZ row for an inactive or non-edge pair stays
-//     slack, so the rows never need to change between calls. Because Middle is
-//     usually close to P here, W ~ P and the relaxation is essentially as tight
-//     as a per-call M = W would give.
-//   * Assumes `Setups` is constant across calls (it is threaded through by
-//     const reference unchanged).
-// ===========================================================================
 void setupDP::BuildTSPModel(ProductPeriods& PPs, const Matrix& Setups)
 {
     if (ModelBuilt)
@@ -429,7 +406,7 @@ double setupDP::SetupTSPModel(CacheMP& cache, ProductPeriods& PPs, const Matrix&
 
         try
         {
-            //TSPcplex.exportModel("TSP.lp");
+            TSPcplex.exportModel("TSP.lp");
             Solved = TSPcplex.solve();
             Min = Solved ? TSPcplex.getObjValue() : DBL_MAX;
         }

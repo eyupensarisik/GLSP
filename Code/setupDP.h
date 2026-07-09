@@ -35,7 +35,7 @@ public:
 	setupDP();
 	~setupDP();
 	
-	int MinSetupMultiPeriod(ProductPeriods& PPs, CacheMP& cache, const Matrix& Setups, int First, vector<ProductSet>& Middle, int Last);
+	int MinSetupMultiPeriod(ProductPeriods& PPs, CacheMP& cache, const Matrix& Setups, int First, vector<ProductSet>& Middle, int Last, int control);
 	int MinSetupMiddle(CacheMP& cache, const Matrix& Setups, int First, ProductSet& Middle, int Last);
 	int SetupBetween(const Matrix& Setups, int i, int j);
 	void generateCombinations(const vector<int>& nums, set<int>& current, int index, vector<set<int>>& all);

@@ -516,7 +516,7 @@ bool GLSP::Solve(double timeLimit)
 
 	try
 	{
-		cplex.exportModel("GLSP.lp");
+		//cplex.exportModel("GLSP.lp");
 		Solved = cplex.solve();
 	}
 	catch (IloException& ex)

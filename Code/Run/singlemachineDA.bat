@@ -3,3 +3,11 @@ call ..\Run\run_tpc.bat SingleMachineCapVar2 TwoPhase_Callback 4 4
 call ..\Run\run_tpc.bat SingleMachineCapVar2 TwoPhase_Callback 5 5
 call ..\Run\run_tpc.bat SingleMachineCapVar2 TwoPhase_Callback 10 5
 call ..\Run\run_tpc.bat SingleMachineCapVar2 TwoPhase_Callback 15 5
+call ..\Run\run_tpc.bat SingleMachineCapVar2 TwoPhase_Callback 15 10
+call ..\Run\run_tpc.bat SingleMachineCapVar2 TwoPhase_Callback 15 15
+call ..\Run\run_tpc.bat SingleMachineCapVar3 TwoPhase_Callback 20 5
+call ..\Run\run_tpc.bat SingleMachineCapVar3 TwoPhase_Callback 20 10
+call ..\Run\run_tpc.bat SingleMachineCapVar3 TwoPhase_Callback 20 15
+call ..\Run\run_tpc.bat SingleMachineCapVar3 TwoPhase_Callback 25 5
+call ..\Run\run_tpc.bat SingleMachineCapVar3 TwoPhase_Callback 25 10
+call ..\Run\run_tpc.bat SingleMachineCapVar3 TwoPhase_Callback 25 15

@@ -172,48 +172,7 @@ void Subproblems::SetupTSPModel(int W, vector<int> wp, vector<int> wt, vector<in
 {
 	// Setup TSP Subroblem
 	TSPcplex.setOut(TSPenv.getNullStream());
-	//Find due-dates and release dates
-	vector<int> dd;
-	dd.resize(PP.T);
-	vector<int> rd;
-	rd.resize(PP.T);
-	int d_sum = 0;
-	for (int t = 0; t < PP.T; ++t) {
-		rd[t] = d_sum;
-		d_sum += PP.K[t];
-		dd[t] = d_sum;
-	}
-
-	//Calculate the Big M value
-	int TotalCapacity = 0;
-	for (int t = 0; t < PP.T; ++t)
-		TotalCapacity += PP.K[t];
-
-	int M = TotalCapacity;
-
-	//Construct Subproblem
-
-	vector<int> SP_a;
-	SP_a.resize(W + 2);
-	for (int j = 1; j < W + 1; ++j)
-		SP_a[j] = PP.Products[wp[j]].a;
-	SP_a[0] = 0;
-	SP_a[W + 1] = 0;
-
-	vector<int> SP_b;
-	SP_b.resize(W + 2);
-	for (int j = 1; j < W + 1; ++j)
-		SP_b[j] = dd[wt[j]];
-	SP_b[0] = 0;
-	SP_b[W + 1] = d_sum;
-
-	vector<int> SP_r;
-	SP_r.resize(W + 2);
-	for (int j = 1; j < W + 1; ++j)
-		SP_r[j] = rd[wt[j]];
-	SP_b[0] = 0;
-	SP_b[W + 1] = 0;
-
+	
 	SP_setup.resize(W + 1);
 	for (int j = 0; j < W + 1; ++j)
 		SP_setup[j].resize(W + 1);
@@ -316,7 +275,7 @@ bool Subproblems::TSP_Solve(double timeLimit)
 
 	try
 	{
-		//TSPcplex.exportModel("TSP.lp");
+		TSPcplex.exportModel("TSP.lp");
 		Solved = TSPcplex.solve();
 	}
 	catch (IloException& ex)

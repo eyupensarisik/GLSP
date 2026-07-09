@@ -138,7 +138,6 @@ void ProductPeriods::ReadData(ifstream& file, int& SetupCostLevel)
 				Products[p].s_pr[r] = ceil(Products[p].s_pr[r] / SetupCostLevel);
 		}
 	}
-
 }
 
 string to_string(const IntegerVector& vect)
