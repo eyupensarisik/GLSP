@@ -17,7 +17,11 @@ This repository contains the source code, data files and parameters for the pape
 * Choose ``Release" build configuration and build the solution.
 * Navigate to Code\Run on command line
 * Run singlemachineStd.bat, singlemachineNF.bat, singlemachineCC.bat, singlemachineDA.bat to run computational experiments reported in the paper. 
-* Outputs will be generated in Code\VS2022\Results folder. 
+* Outputs will be generated in Code\VS2022\Results folder.
+
+# Formal verification
+* The validity of the lifted cut (Proposition 2) and Proposition 1 is formally verified
+* in Lean 4 with Mathlib. See [`lean/`](lean/) for the code and build instructions. 
 
 # References
 * James RJ and Almada-Lobo B. Single and parallel machine capacitated lotsizing and scheduling: New iterative MIP-based neighborhood search heuristics. Computers & Operations Research 2011;38:1816–25.
