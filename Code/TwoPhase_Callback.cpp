@@ -115,6 +115,28 @@ void TwoPhaseC::SetupModel(double timeLimit)
 		for (int p = 0; p < PP.P; ++p)
 			model.add(q[p][t] >= PP.Products[p].m * x[p][t]);
 	
+	//Initialization for DP (Fill the Cache)
+	vector<ProductSet> ProductPPs_In;
+
+	for (int t = 0; t < PP.T; ++t) {
+		ProductSet MPcurrent;
+		for (int p = 0; p < PP.P; ++p) {
+			MPcurrent.insert(p);
+		}
+		ProductPPs_In.push_back(MPcurrent);
+	}
+
+	vector<ProductSet> ProductPPsCopy;
+	for (int i = 0; i < ProductPPs_In.size(); ++i)
+	{
+		if (!ProductPPs_In[i].empty())
+			ProductPPsCopy.push_back(ProductPPs_In[i]);
+	}
+	ProductPPs_In = ProductPPsCopy;
+
+	//Set the Global Lower Bound Value
+	if (!ProductPPs_In[0].empty())
+		LB_theta = sDP.MinSetupMiddle(MPcache, setup_pr, -1, ProductPPs_In[0], -1);
 	
 	IloExpr thetaCut(env);
 	for (int t = 0; t < PP.T; ++t)
@@ -702,14 +724,14 @@ bool WorkerWW::separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_th
 			cuts.clear();
 
 			//Local Lower Bound Calculation
-			int LB = 0;
-			
-			vector<int> set_min_p;
+			double LB = 0;
+			/**/
+			vector<double> set_min_p;
 			set_min_p.resize(PP.P);
 
 			for (int p = 0; p < PP.P; ++p) {
-				int set_mins = INT_MAX;
-				int set_min = INT_MAX;
+				double set_mins = DBL_MAX;
+				double set_min = DBL_MAX;
 				for (int r = 0; r < PP.P; ++r) {
 					if (p != r)
 						set_mins = PP.Products[p].s_pr[r];
@@ -720,13 +742,13 @@ bool WorkerWW::separate(ProductPeriods& PP, ParameterMap& Parameters, int& LB_th
 				set_min_p[p] = set_min;
 			}
 
-			vector<int> set_min_total;
+			vector<double> set_min_total;
 			set_min_total.resize(W);
 
 			for (int k = 0; k < W; ++k) {
 				int kk = 0;
 				for (int t = 0; t < PP.T; ++t) {
-					int set_min_max = 0;
+					double set_min_max = 0;
 					for (int p = 0; p < PP.P; ++p) {
 						if (x_val[p][t] >= 0.5) {
 							if (kk != k) {

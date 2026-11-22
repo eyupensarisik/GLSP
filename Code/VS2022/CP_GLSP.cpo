@@ -1,0 +1,94 @@
+// --------------------------------------------------------------------------
+// IBM ILOG CP Optimizer model export file
+// Effective workers: 4
+// --------------------------------------------------------------------------
+
+// ------ Internal data: ----------------------------------------------------
+
+internals {
+  version(22.1.1.0);
+  architecture("x64_windows_msvc14/stat_mda", 64);
+}
+
+// ------ Interval-related variables: ---------------------------------------
+
+"Y@0" = intervalVar(size=1);
+"Y@1" = intervalVar(size=1);
+"Y@2" = intervalVar(size=1);
+"Y@3" = intervalVar(size=1);
+"Y@4" = intervalVar(size=1);
+"Y@5" = intervalVar(size=1);
+"Y@6" = intervalVar(size=1);
+"Y@7" = intervalVar(size=1);
+"Y@8" = intervalVar(size=1);
+"Y@9" = intervalVar(size=1);
+V = sequenceVar(["Y@0", "Y@1", "Y@2", "Y@3", "Y@4", "Y@5", "Y@6", "Y@7", "Y@8", "Y@9"], [0..9]);
+
+// ------ Objective: --------------------------------------------------------
+
+minimize(sum([element([0, 0, 0, 448, 448, 376, 376, 321, 321, 321], typeOfNext(V, "Y@0")), element([0, 0, 0, 448, 448, 376, 376, 321, 321, 321], typeOfNext(V, "Y@1", 1)), element([0, 0, 0, 448, 448, 376, 376, 321, 321, 321], typeOfNext(V, "Y@2", 2)), element([309, 309, 309, 0, 0, 359, 359, 274, 274, 274], typeOfNext(V, "Y@3", 3)), element([309, 309, 309, 0, 0, 359, 359, 274, 274, 274], typeOfNext(V, "Y@4", 4)), element([493, 493, 493, 461, 461, 0, 0, 460, 460, 460], typeOfNext(V, "Y@5", 5)), element([493, 493, 493, 461, 461, 0, 0, 460, 460, 460], typeOfNext(V, "Y@6", 6)), element([367, 367, 367, 444, 444, 254, 254, 0, 0, 0], typeOfNext(V, "Y@7", 7)), element([367, 367, 367, 444, 444, 254, 254, 0, 0, 0], typeOfNext(V, "Y@8", 8)), element([367, 367, 367, 444, 444, 254, 254, 0, 0, 0], typeOfNext(V, "Y@9", 9))]));
+
+// ------ Constraints: ------------------------------------------------------
+
+noOverlap(V);
+startOf("Y@0") >= 0;
+startOf("Y@1") >= 4;
+startOf("Y@2") >= 5;
+startOf("Y@3") >= 0;
+startOf("Y@4") >= 5;
+startOf("Y@5") >= 0;
+startOf("Y@6") >= 5;
+startOf("Y@7") >= 0;
+startOf("Y@8") >= 5;
+startOf("Y@9") >= 9;
+endOf("Y@0") <= 4;
+endOf("Y@1") <= 5;
+endOf("Y@2") <= 9;
+endOf("Y@3") <= 4;
+endOf("Y@4") <= 9;
+endOf("Y@5") <= 4;
+endOf("Y@6") <= 9;
+endOf("Y@7") <= 4;
+endOf("Y@8") <= 9;
+endOf("Y@9") <= 10;
+
+parameters {
+  TimeLimit = 1800;
+  Workers = 4;
+}
+
+-----------------------------------------
+
+noOverlap(V);
+startOf("Y@0") >= 0;
+startOf("Y@1") >= 4;
+startOf("Y@2") >= 6;
+startOf("Y@3") >= 10;
+startOf("Y@4") >= 0;
+startOf("Y@5") >= 6;
+startOf("Y@6") >= 10;
+startOf("Y@7") >= 0;
+startOf("Y@8") >= 6;
+startOf("Y@9") >= 0;
+startOf("Y@10") >= 4;
+startOf("Y@11") >= 6;
+startOf("Y@12") >= 10;
+endOf("Y@0") <= 4;
+endOf("Y@1") <= 6;
+endOf("Y@2") <= 10;
+endOf("Y@3") <= 13;
+endOf("Y@4") <= 4;
+endOf("Y@5") <= 10;
+endOf("Y@6") <= 13;
+endOf("Y@7") <= 4;
+endOf("Y@8") <= 10;
+endOf("Y@9") <= 4;
+endOf("Y@10") <= 6;
+endOf("Y@11") <= 10;
+endOf("Y@12") <= 13;
+
+parameters {
+  TimeLimit = 1800;
+  Workers = 4;
+}
+
